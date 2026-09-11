@@ -30,6 +30,7 @@ import 'wo_row_form_screen.dart';
 class DashboardScreen extends StatefulWidget {
   final Map<String, dynamic> sesi;
   const DashboardScreen({super.key, required this.sesi});
+
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
@@ -46,7 +47,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final _insduRepo = WoInsduRepository();
   final _rowRepo = WoRowRepository();
   final _harJarRepo = WoHarJarRepository();
+
   int _selected = 1;
+  int _settingsRevision = 0;
   List<WoInsjar> _insjar = const [];
   List<WoInsdu> _insdu = const [];
   List<WoRow> _rows = const [];
@@ -54,12 +57,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   String get _token => '${widget.sesi['token'] ?? ''}';
   String get _identity =>
-      '${widget.sesi['subTim'] ?? widget.sesi['tim'] ?? ''} ${widget.sesi['username'] ?? ''}'.toLowerCase();
+      '${widget.sesi['subTim'] ?? widget.sesi['tim'] ?? ''} ${widget.sesi['username'] ?? ''}'
+          .toLowerCase();
   bool get _isInsdu =>
       _identity.contains('inspeksi gardu') || _identity.contains('insdu');
   bool get _isRow => !_isInsdu && _identity.contains('row');
   bool get _isHarJar =>
-      !_isInsdu && !_isRow &&
+      !_isInsdu &&
+      !_isRow &&
       (_identity.contains('har jar') || _identity.contains('harjar'));
   String get _label => _isInsdu
       ? 'WO Inspeksi Gardu'
@@ -81,10 +86,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ? _rows.where((item) => item.isDirty).length
           : _isHarJar
               ? _harJar
-                  .where((item) =>
-                      WoHarJar.normalisasiStatus(item.statusWo) ==
-                          WoHarJar.statusSelesai &&
-                      !item.isSynced)
+                  .where(
+                    (item) =>
+                        WoHarJar.normalisasiStatus(item.statusWo) ==
+                            WoHarJar.statusSelesai &&
+                        !item.isSynced,
+                  )
                   .length
               : _insjar.where((item) => item.isDirty).length;
 
@@ -105,6 +112,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _insjar = await _insjarRepo.semua();
     }
     if (mounted) setState(() {});
+  }
+
+  Future<void> _refreshSettings() async {
+    await _load();
+    if (mounted) setState(() => _settingsRevision++);
   }
 
   void _message(String text, {bool error = false}) {
@@ -257,8 +269,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            FormTindakLanjutHarJarScreen(sesi: widget.sesi, existing: current),
+        builder: (_) => FormTindakLanjutHarJarScreen(
+          sesi: widget.sesi,
+          existing: current,
+        ),
       ),
     );
     await _load();
@@ -297,8 +311,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       );
 
-  Widget _refreshable(List<Widget> children) => RefreshIndicator(
-        onRefresh: _load,
+  Widget _refreshable(
+    List<Widget> children, {
+    Future<void> Function()? onRefresh,
+  }) =>
+      RefreshIndicator(
+        onRefresh: onRefresh ?? _load,
         color: blue,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -439,10 +457,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return _refreshable(children);
   }
 
-  Widget _settings() => ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(18),
-        children: [
+  Widget _settings() => _refreshable(
+        [
           const Text(
             'Data & Server Lokal',
             style: TextStyle(
@@ -452,8 +468,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          SettingsSessionSection(session: widget.sesi),
+          SettingsSessionSection(
+            key: ValueKey(_settingsRevision),
+            session: widget.sesi,
+          ),
         ],
+        onRefresh: _refreshSettings,
       );
 
   Widget _empty() => Container(
