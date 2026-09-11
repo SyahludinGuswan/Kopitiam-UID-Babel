@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-// UI fixes in this branch are validated by Flutter CI before merge.
 import '../models/wo_har_jar.dart';
 import '../models/wo_insdu.dart';
 import '../models/wo_insjar.dart';
@@ -30,9 +29,7 @@ import 'wo_row_form_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Map<String, dynamic> sesi;
-
   const DashboardScreen({super.key, required this.sesi});
-
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
@@ -49,7 +46,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final _insduRepo = WoInsduRepository();
   final _rowRepo = WoRowRepository();
   final _harJarRepo = WoHarJarRepository();
-
   int _selected = 1;
   List<WoInsjar> _insjar = const [];
   List<WoInsdu> _insdu = const [];
@@ -58,14 +54,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   String get _token => '${widget.sesi['token'] ?? ''}';
   String get _identity =>
-      '${widget.sesi['subTim'] ?? widget.sesi['tim'] ?? ''} ${widget.sesi['username'] ?? ''}'
-          .toLowerCase();
+      '${widget.sesi['subTim'] ?? widget.sesi['tim'] ?? ''} ${widget.sesi['username'] ?? ''}'.toLowerCase();
   bool get _isInsdu =>
       _identity.contains('inspeksi gardu') || _identity.contains('insdu');
   bool get _isRow => !_isInsdu && _identity.contains('row');
   bool get _isHarJar =>
-      !_isInsdu &&
-      !_isRow &&
+      !_isInsdu && !_isRow &&
       (_identity.contains('har jar') || _identity.contains('harjar'));
   String get _label => _isInsdu
       ? 'WO Inspeksi Gardu'
@@ -87,12 +81,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ? _rows.where((item) => item.isDirty).length
           : _isHarJar
               ? _harJar
-                  .where(
-                    (item) =>
-                        WoHarJar.normalisasiStatus(item.statusWo) ==
-                            WoHarJar.statusSelesai &&
-                        !item.isSynced,
-                  )
+                  .where((item) =>
+                      WoHarJar.normalisasiStatus(item.statusWo) ==
+                          WoHarJar.statusSelesai &&
+                      !item.isSynced)
                   .length
               : _insjar.where((item) => item.isDirty).length;
 
@@ -146,10 +138,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         downloaded = result.diproses;
         error = result.pesan;
       }
-
       await _load();
       if (!mounted) return;
-
       if (error != null && error.trim().isNotEmpty) {
         await showOperationResultDialog(
           context,
@@ -157,24 +147,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
           title: 'Download WO Gagal',
           message: error,
         );
-        return;
-      }
-      if (downloaded == 0) {
+      } else if (downloaded == 0) {
         await showOperationResultDialog(
           context,
           success: true,
           title: 'WO Sudah di Download Semua',
           message: 'Tidak ada Work Order baru yang perlu diunduh.',
         );
-        return;
+      } else {
+        await showOperationResultDialog(
+          context,
+          success: true,
+          title: 'WO Tersimpan',
+          message:
+              '$downloaded WO baru berhasil disimpan ke perangkat. Ringkasan Work Order sudah diperbarui.',
+        );
       }
-      await showOperationResultDialog(
-        context,
-        success: true,
-        title: 'WO Tersimpan',
-        message:
-            '$downloaded WO baru berhasil disimpan ke perangkat. Ringkasan Work Order sudah diperbarui.',
-      );
     } catch (error) {
       if (!mounted) return;
       await showOperationResultDialog(
@@ -227,10 +215,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) => WoInsjarFormScreen(
-          sesi: widget.sesi,
-          existing: current,
-        ),
+        builder: (_) =>
+            WoInsjarFormScreen(sesi: widget.sesi, existing: current),
       ),
     );
     await _load();
@@ -243,10 +229,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) => WoInsduFormScreen(
-          existing: current,
-          sesi: widget.sesi,
-        ),
+        builder: (_) =>
+            WoInsduFormScreen(existing: current, sesi: widget.sesi),
       ),
     );
     await _load();
@@ -259,10 +243,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) => WoRowFormScreen(
-          sesi: widget.sesi,
-          existing: current,
-        ),
+        builder: (_) =>
+            WoRowFormScreen(sesi: widget.sesi, existing: current),
       ),
     );
     await _load();
@@ -275,10 +257,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) => FormTindakLanjutHarJarScreen(
-          sesi: widget.sesi,
-          existing: current,
-        ),
+        builder: (_) =>
+            FormTindakLanjutHarJarScreen(sesi: widget.sesi, existing: current),
       ),
     );
     await _load();
@@ -296,10 +276,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 'assets/icons/${_selected == 0 ? 'work_order' : _selected == 1 ? 'beranda' : 'pengaturan'}.svg',
                 width: 26,
                 height: 26,
-                colorFilter: const ColorFilter.mode(
-                  Colors.white,
-                  BlendMode.srcIn,
-                ),
+                colorFilter:
+                    const ColorFilter.mode(Colors.white, BlendMode.srcIn),
               ),
               const SizedBox(width: 10),
               Text(
@@ -319,56 +297,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       );
 
+  Widget _refreshable(List<Widget> children) => RefreshIndicator(
+        onRefresh: _load,
+        color: blue,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(18),
+          children: children,
+        ),
+      );
+
   Widget _workOrders() {
     final cards = <Widget>[];
     if (_isInsdu) {
-      cards.addAll(
-        _insdu.map(
-          (wo) => WoInsduCard(
+      cards.addAll(_insdu.map((wo) => WoInsduCard(
             wo: wo,
             onStart: () => _openInsdu(wo, start: true),
             onOpen: () => _openInsdu(wo),
-          ),
-        ),
-      );
+          )));
     } else if (_isRow) {
-      cards.addAll(
-        _rows.map(
-          (wo) => WoRowCard(
+      cards.addAll(_rows.map((wo) => WoRowCard(
             row: wo,
             onStart: () => _openRow(wo, start: true),
             onOpen: () => _openRow(wo),
-          ),
-        ),
-      );
+          )));
     } else if (_isHarJar) {
-      cards.addAll(
-        _harJar.map(
-          (wo) => WoHarJarCard(
+      cards.addAll(_harJar.map((wo) => WoHarJarCard(
             wo: wo,
             onKerjakan: () => _openHarJar(wo, start: true),
             onLanjut: () => _openHarJar(wo),
-          ),
-        ),
-      );
+          )));
     } else {
-      cards.addAll(
-        _insjar.map(
-          (wo) => WoInsjarCard(
+      cards.addAll(_insjar.map((wo) => WoInsjarCard(
             wo: wo,
             onStart: () => _openInsjar(wo, start: true),
             onOpen: () => _openInsjar(wo),
-          ),
-        ),
-      );
+          )));
     }
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView(
-        padding: const EdgeInsets.all(18),
-        children: cards.isEmpty ? [_empty()] : cards,
-      ),
-    );
+    return _refreshable(cards.isEmpty ? [_empty()] : cards);
   }
 
   Widget _home() {
@@ -377,99 +343,81 @@ class _DashboardScreenState extends State<DashboardScreen> {
       const SizedBox(height: 16),
     ];
     if (RoleProvider.hasC4aAccess(widget.sesi)) {
-      children.add(
-        Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: const BorderSide(color: line),
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(18),
-            leading: const CircleAvatar(
-              backgroundColor: amber,
-              foregroundColor: navy,
-              child: Icon(Icons.fact_check_outlined),
-            ),
-            title: const Text(
-              'Temuan C4A',
-              style: TextStyle(fontWeight: FontWeight.w900, color: navy),
-            ),
-            subtitle: const Text(
-              'Draft lokal, antrean kirim, status gagal, dan kirim ulang.',
-            ),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: _openC4a,
-          ),
+      children.add(Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: line),
         ),
-      );
+        child: ListTile(
+          contentPadding: const EdgeInsets.all(18),
+          leading: const CircleAvatar(
+            backgroundColor: amber,
+            foregroundColor: navy,
+            child: Icon(Icons.fact_check_outlined),
+          ),
+          title: const Text(
+            'Temuan C4A',
+            style: TextStyle(fontWeight: FontWeight.w900, color: navy),
+          ),
+          subtitle: const Text(
+            'Draft lokal, antrean kirim, status gagal, dan kirim ulang.',
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: _openC4a,
+        ),
+      ));
       children.add(const SizedBox(height: 16));
     }
-
     if (!_isHarJar && !_isInsdu) {
       final waiting = _isRow
           ? _rows
-              .where(
-                (item) =>
-                    WoRow.normalisasiStatus(item.statusWo) ==
-                    WoRow.statusPenugasan,
-              )
+              .where((item) =>
+                  WoRow.normalisasiStatus(item.statusWo) ==
+                  WoRow.statusPenugasan)
               .length
           : _insjar
-              .where(
-                (item) =>
-                    WoInsjar.normalisasiStatus(item.statusWo) ==
-                    WoInsjar.statusMulai,
-              )
+              .where((item) =>
+                  WoInsjar.normalisasiStatus(item.statusWo) ==
+                  WoInsjar.statusMulai)
               .length;
       final progress = _isRow
           ? _rows
-              .where(
-                (item) =>
-                    WoRow.normalisasiStatus(item.statusWo) ==
-                    WoRow.statusProgress,
-              )
+              .where((item) =>
+                  WoRow.normalisasiStatus(item.statusWo) ==
+                  WoRow.statusProgress)
               .length
           : _insjar
-              .where(
-                (item) =>
-                    WoInsjar.normalisasiStatus(item.statusWo) ==
-                    WoInsjar.statusDalam,
-              )
+              .where((item) =>
+                  WoInsjar.normalisasiStatus(item.statusWo) ==
+                  WoInsjar.statusDalam)
               .length;
       final done = _isRow
           ? _rows
-              .where(
-                (item) =>
-                    WoRow.normalisasiStatus(item.statusWo) ==
-                    WoRow.statusSelesai,
-              )
+              .where((item) =>
+                  WoRow.normalisasiStatus(item.statusWo) ==
+                  WoRow.statusSelesai)
               .length
           : _insjar
-              .where(
-                (item) =>
-                    WoInsjar.normalisasiStatus(item.statusWo) ==
-                    WoInsjar.statusSelesai,
-              )
+              .where((item) =>
+                  WoInsjar.normalisasiStatus(item.statusWo) ==
+                  WoInsjar.statusSelesai)
               .length;
-      children.add(
-        _isRow
-            ? WoSummaryCard.row(
-                total: _totalReady,
-                penugasan: waiting,
-                progress: progress,
-                selesai: done,
-              )
-            : WoSummaryCard.insjar(
-                total: _totalReady,
-                menunggu: waiting,
-                sedang: progress,
-                selesai: done,
-              ),
-      );
+      children.add(_isRow
+          ? WoSummaryCard.row(
+              total: _totalReady,
+              penugasan: waiting,
+              progress: progress,
+              selesai: done,
+            )
+          : WoSummaryCard.insjar(
+              total: _totalReady,
+              menunggu: waiting,
+              sedang: progress,
+              selesai: done,
+            ));
       children.add(const SizedBox(height: 16));
     }
-
     children.addAll([
       const Text(
         'PUSAT DATA WORK ORDER',
@@ -488,14 +436,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         onSync: _sync,
       ),
     ]);
-
-    return ListView(
-      padding: const EdgeInsets.all(18),
-      children: children,
-    );
+    return _refreshable(children);
   }
 
   Widget _settings() => ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(18),
         children: [
           const Text(
