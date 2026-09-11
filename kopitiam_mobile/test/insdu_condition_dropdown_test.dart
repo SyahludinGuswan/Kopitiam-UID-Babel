@@ -22,7 +22,7 @@ List<String?> options(WidgetTester tester, String label) {
 }
 
 void main() {
-  testWidgets('cover dan jumper memakai kriteria dropdown yang ditetapkan', (
+  testWidgets('form Gardu memakai enam bagian dan dropdown kondisi tetap lengkap', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -30,6 +30,7 @@ void main() {
         home: WoInsduFormScreen(
           existing: WoInsdu(
             kodeWo: 'INSDU-001',
+            nomorGardu: 'GD-101',
             statusWo: WoInsdu.statusDalam,
           ),
           sesi: {'subTim': 'Inspeksi Gardu'},
@@ -37,14 +38,18 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Pengukuran'));
-    await tester.pumpAndSettle();
 
-    final scrollable = find.descendant(
-      of: find.byType(ListView),
-      matching: find.byType(Scrollable),
-    ).first;
-    await tester.scrollUntilVisible(field('Cover FCO Atas'), 400, scrollable: scrollable);
+    expect(find.text('01'), findsOneWidget);
+    expect(find.text('Identitas Gardu'), findsOneWidget);
+    expect(find.text('Pengukuran WBP'), findsOneWidget);
+    expect(find.text('Pengukuran LWBP'), findsOneWidget);
+
+    final list = find.byType(ListView);
+    await tester.scrollUntilVisible(
+      field('Cover FCO Atas'),
+      500,
+      scrollable: find.descendant(of: list, matching: find.byType(Scrollable)),
+    );
     expect(options(tester, 'Cover FCO Atas'), [
       'Lengkap',
       'Tidak Lengkap',
@@ -52,7 +57,11 @@ void main() {
       'Tidak ada',
     ]);
 
-    await tester.scrollUntilVisible(field('Jumperan Atas'), 250, scrollable: scrollable);
+    await tester.scrollUntilVisible(
+      field('Jumperan Atas'),
+      250,
+      scrollable: find.descendant(of: list, matching: find.byType(Scrollable)),
+    );
     expect(options(tester, 'Jumperan Atas'), [
       'A3C',
       'A3CS (Lengkap)',
