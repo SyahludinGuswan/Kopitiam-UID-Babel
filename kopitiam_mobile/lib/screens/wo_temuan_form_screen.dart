@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import '../models/wo_insjar.dart';
 import 'temuan_form_screen.dart';
 
-/// Compatibility entry point for the imported PR60 Temuan flow.
-/// The full form can be swapped in without changing TemuanTab navigation.
+/// Entry point khusus Temuan dari detail WO Inspeksi Jaringan.
+///
+/// Form visual dan alur validasinya berasal dari implementasi PR 60 di
+/// [TemuanFormScreen]. C4A tetap memakai constructor `TemuanFormScreen.c4a`,
+/// sehingga kedua alur tidak saling tertukar.
 class WoTemuanFormScreen extends StatelessWidget {
   final WoInsjar wo;
   final Map<String, dynamic> sesi;
@@ -17,6 +20,7 @@ class WoTemuanFormScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => TemuanFormScreen(
+        key: ValueKey('pr60-wo-temuan-${wo.kodeWo}'),
         wo: wo,
         sesi: sesi,
       );
