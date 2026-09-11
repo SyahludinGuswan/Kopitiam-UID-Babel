@@ -10,7 +10,7 @@ class SqliteService {
   SqliteService._();
   static final SqliteService instance = SqliteService._();
   static const _databaseName = 'simandist_local.db';
-  static const _databaseVersion = 9;
+  static const _databaseVersion = 10;
   static const masterDatasets = ['User_App_Mobile','Master_Penyulang','Master_Keypoint','Master_Temuan','Jenis Pohon','Master_Material','Master_Pekerjaan_Har','Master_Gardu'];
   Database? _database;
 
@@ -31,6 +31,7 @@ class SqliteService {
         if (oldVersion < 7) await DatabaseHelper.createInsduSchema(db);
         if (oldVersion < 8) await DatabaseHelper.createYandalP0Schema(db);
         if (oldVersion < 9) await _createC4aQueueSchema(db);
+        if (oldVersion < 10) await _migrateInsduV10(db);
       },
     );
     return _database!;
@@ -50,16 +51,15 @@ class SqliteService {
 
   Future<void> _createC4aQueueSchema(Database db) async {
     await db.execute("""CREATE TABLE IF NOT EXISTS temuan_inspeksi (
-      kode_temuan TEXT PRIMARY KEY, kode_wo TEXT NOT NULL DEFAULT '',
-      kode_uiw TEXT DEFAULT '', kode_up3 TEXT DEFAULT '', kode_ulp TEXT DEFAULT '', ulp TEXT DEFAULT '',
-      hari TEXT DEFAULT '', tanggal TEXT DEFAULT '', penyulang TEXT DEFAULT '', section_awal TEXT DEFAULT '',
-      section_akhir TEXT DEFAULT '', section TEXT DEFAULT '', segmen TEXT DEFAULT '', nomor_gardu TEXT DEFAULT '',
-      koordinat TEXT DEFAULT '', lat TEXT DEFAULT '', long TEXT DEFAULT '', jenis_object TEXT DEFAULT '', tier TEXT DEFAULT '',
-      temuan TEXT DEFAULT '', jarak REAL, jenis_pohon TEXT DEFAULT '', tinggi_pohon REAL, prioritas TEXT DEFAULT '',
-      pekerjaan TEXT DEFAULT '', jenis_wo TEXT DEFAULT '', foto_temuan TEXT DEFAULT '', foto_lingkungan TEXT DEFAULT '',
-      link_foto TEXT DEFAULT '', link_lingkungan TEXT DEFAULT '', waktu_input TEXT DEFAULT '', user_input TEXT DEFAULT '',
-      folder_path TEXT DEFAULT '', is_dirty INTEGER DEFAULT 1, sync_status TEXT NOT NULL DEFAULT 'queued',
-      sync_error TEXT NOT NULL DEFAULT '', retry_count INTEGER NOT NULL DEFAULT 0, last_attempt_at TEXT NOT NULL DEFAULT '')""");
+      kode_temuan TEXT PRIMARY KEY, kode_wo TEXT NOT NULL DEFAULT '', kode_uiw TEXT DEFAULT '', kode_up3 TEXT DEFAULT '',
+      kode_ulp TEXT DEFAULT '', ulp TEXT DEFAULT '', hari TEXT DEFAULT '', tanggal TEXT DEFAULT '', penyulang TEXT DEFAULT '',
+      section_awal TEXT DEFAULT '', section_akhir TEXT DEFAULT '', section TEXT DEFAULT '', segmen TEXT DEFAULT '', nomor_gardu TEXT DEFAULT '',
+      koordinat TEXT DEFAULT '', lat TEXT DEFAULT '', long TEXT DEFAULT '', jenis_object TEXT DEFAULT '', tier TEXT DEFAULT '', temuan TEXT DEFAULT '',
+      jarak REAL, jenis_pohon TEXT DEFAULT '', tinggi_pohon REAL, prioritas TEXT DEFAULT '', pekerjaan TEXT DEFAULT '', jenis_wo TEXT DEFAULT '',
+      foto_temuan TEXT DEFAULT '', foto_lingkungan TEXT DEFAULT '', link_foto TEXT DEFAULT '', link_lingkungan TEXT DEFAULT '',
+      waktu_input TEXT DEFAULT '', user_input TEXT DEFAULT '', folder_path TEXT DEFAULT '', is_dirty INTEGER DEFAULT 1,
+      sync_status TEXT NOT NULL DEFAULT 'queued', sync_error TEXT NOT NULL DEFAULT '', retry_count INTEGER NOT NULL DEFAULT 0,
+      last_attempt_at TEXT NOT NULL DEFAULT '')""");
     await _addColumnIfMissing(db, 'temuan_inspeksi', 'sync_status', "TEXT NOT NULL DEFAULT 'queued'");
     await _addColumnIfMissing(db, 'temuan_inspeksi', 'sync_error', "TEXT NOT NULL DEFAULT ''");
     await _addColumnIfMissing(db, 'temuan_inspeksi', 'retry_count', 'INTEGER NOT NULL DEFAULT 0');
@@ -75,13 +75,11 @@ class SqliteService {
   Future<void> _createWoSchema(Database db) async {
     await db.execute("""CREATE TABLE IF NOT EXISTS wo_insjar (
       id INTEGER PRIMARY KEY AUTOINCREMENT, no TEXT NOT NULL DEFAULT '', kode_wo TEXT NOT NULL UNIQUE,
-      kode_uiw TEXT NOT NULL DEFAULT '', kode_up3 TEXT NOT NULL DEFAULT '', kode_ulp TEXT NOT NULL DEFAULT '',
-      ulp TEXT NOT NULL DEFAULT '', hari TEXT NOT NULL DEFAULT '', tanggal TEXT NOT NULL DEFAULT '',
-      penyulang TEXT NOT NULL DEFAULT '', section_awal TEXT NOT NULL DEFAULT '', section_akhir TEXT NOT NULL DEFAULT '',
-      section TEXT NOT NULL DEFAULT '', koordinat_awal TEXT NOT NULL DEFAULT '', koordinat_akhir TEXT NOT NULL DEFAULT '',
-      realisasi_kms REAL, waktu_mulai TEXT NOT NULL DEFAULT '', waktu_selesai TEXT NOT NULL DEFAULT '',
-      durasi_pekerjaan TEXT NOT NULL DEFAULT '', status_wo TEXT NOT NULL DEFAULT '', synced_at TEXT NOT NULL DEFAULT '',
-      is_dirty INTEGER NOT NULL DEFAULT 0)""");
+      kode_uiw TEXT NOT NULL DEFAULT '', kode_up3 TEXT NOT NULL DEFAULT '', kode_ulp TEXT NOT NULL DEFAULT '', ulp TEXT NOT NULL DEFAULT '',
+      hari TEXT NOT NULL DEFAULT '', tanggal TEXT NOT NULL DEFAULT '', penyulang TEXT NOT NULL DEFAULT '', section_awal TEXT NOT NULL DEFAULT '',
+      section_akhir TEXT NOT NULL DEFAULT '', section TEXT NOT NULL DEFAULT '', koordinat_awal TEXT NOT NULL DEFAULT '',
+      koordinat_akhir TEXT NOT NULL DEFAULT '', realisasi_kms REAL, waktu_mulai TEXT NOT NULL DEFAULT '', waktu_selesai TEXT NOT NULL DEFAULT '',
+      durasi_pekerjaan TEXT NOT NULL DEFAULT '', status_wo TEXT NOT NULL DEFAULT '', synced_at TEXT NOT NULL DEFAULT '', is_dirty INTEGER NOT NULL DEFAULT 0)""");
     await db.execute('CREATE INDEX IF NOT EXISTS idx_wo_insjar_tanggal ON wo_insjar(tanggal)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_wo_insjar_status ON wo_insjar(status_wo)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_wo_insjar_dirty ON wo_insjar(is_dirty)');
@@ -90,18 +88,17 @@ class SqliteService {
   Future<void> _createWoRowSchema(Database db) async {
     await db.execute("""CREATE TABLE IF NOT EXISTS wo_row (
       id INTEGER PRIMARY KEY AUTOINCREMENT, no TEXT NOT NULL DEFAULT '', kode_wo TEXT NOT NULL UNIQUE,
-      kode_temuan TEXT NOT NULL DEFAULT '', kode_uiw TEXT NOT NULL DEFAULT '', kode_up3 TEXT NOT NULL DEFAULT '',
-      kode_ulp TEXT NOT NULL DEFAULT '', ulp TEXT NOT NULL DEFAULT '', hari TEXT NOT NULL DEFAULT '', tanggal TEXT NOT NULL DEFAULT '',
-      penyulang TEXT NOT NULL DEFAULT '', section_awal TEXT NOT NULL DEFAULT '', section_akhir TEXT NOT NULL DEFAULT '',
-      section TEXT NOT NULL DEFAULT '', segmen TEXT NOT NULL DEFAULT '', jenis_object TEXT NOT NULL DEFAULT '', tier TEXT NOT NULL DEFAULT '',
-      temuan TEXT NOT NULL DEFAULT '', prioritas TEXT NOT NULL DEFAULT '', pekerjaan TEXT NOT NULL DEFAULT '', jenis_wo TEXT NOT NULL DEFAULT '',
-      koordinat TEXT NOT NULL DEFAULT '', lat TEXT NOT NULL DEFAULT '', long TEXT NOT NULL DEFAULT '', jarak REAL,
-      jenis_pohon TEXT NOT NULL DEFAULT '', tinggi_pohon REAL, tim_eksekusi TEXT NOT NULL DEFAULT '', tindak_lanjut TEXT NOT NULL DEFAULT '',
-      ukuran_diameter_batang INTEGER, jenis_tebangan TEXT NOT NULL DEFAULT '', foto_temuan TEXT NOT NULL DEFAULT '',
+      kode_temuan TEXT NOT NULL DEFAULT '', kode_uiw TEXT NOT NULL DEFAULT '', kode_up3 TEXT NOT NULL DEFAULT '', kode_ulp TEXT NOT NULL DEFAULT '',
+      ulp TEXT NOT NULL DEFAULT '', hari TEXT NOT NULL DEFAULT '', tanggal TEXT NOT NULL DEFAULT '', penyulang TEXT NOT NULL DEFAULT '',
+      section_awal TEXT NOT NULL DEFAULT '', section_akhir TEXT NOT NULL DEFAULT '', section TEXT NOT NULL DEFAULT '', segmen TEXT NOT NULL DEFAULT '',
+      jenis_object TEXT NOT NULL DEFAULT '', tier TEXT NOT NULL DEFAULT '', temuan TEXT NOT NULL DEFAULT '', prioritas TEXT NOT NULL DEFAULT '',
+      pekerjaan TEXT NOT NULL DEFAULT '', jenis_wo TEXT NOT NULL DEFAULT '', koordinat TEXT NOT NULL DEFAULT '', lat TEXT NOT NULL DEFAULT '',
+      long TEXT NOT NULL DEFAULT '', jarak REAL, jenis_pohon TEXT NOT NULL DEFAULT '', tinggi_pohon REAL, tim_eksekusi TEXT NOT NULL DEFAULT '',
+      tindak_lanjut TEXT NOT NULL DEFAULT '', ukuran_diameter_batang INTEGER, jenis_tebangan TEXT NOT NULL DEFAULT '', foto_temuan TEXT NOT NULL DEFAULT '',
       link_foto TEXT NOT NULL DEFAULT '', foto_lingkungan TEXT NOT NULL DEFAULT '', link_lingkungan TEXT NOT NULL DEFAULT '',
-      foto_sesudah TEXT NOT NULL DEFAULT '', link_foto_sesudah TEXT NOT NULL DEFAULT '', status_wo TEXT NOT NULL DEFAULT '',
-      user_input TEXT NOT NULL DEFAULT '', waktu_input TEXT NOT NULL DEFAULT '', waktu_realisasi TEXT NOT NULL DEFAULT '',
-      folder_path TEXT NOT NULL DEFAULT '', synced_at TEXT NOT NULL DEFAULT '', is_dirty INTEGER NOT NULL DEFAULT 0)""");
+      foto_sesudah TEXT NOT NULL DEFAULT '', link_foto_sesudah TEXT NOT NULL DEFAULT '', status_wo TEXT NOT NULL DEFAULT '', user_input TEXT NOT NULL DEFAULT '',
+      waktu_input TEXT NOT NULL DEFAULT '', waktu_realisasi TEXT NOT NULL DEFAULT '', folder_path TEXT NOT NULL DEFAULT '',
+      synced_at TEXT NOT NULL DEFAULT '', is_dirty INTEGER NOT NULL DEFAULT 0)""");
     await db.execute('CREATE INDEX IF NOT EXISTS idx_wo_row_status ON wo_row(status_wo)');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_wo_row_dirty ON wo_row(is_dirty)');
   }
@@ -109,6 +106,15 @@ class SqliteService {
   Future<void> _migrateWoRowV5(Database db) async {
     await _addColumnIfMissing(db, 'wo_row', 'section_awal', "TEXT NOT NULL DEFAULT ''");
     await _addColumnIfMissing(db, 'wo_row', 'section_akhir', "TEXT NOT NULL DEFAULT ''");
+  }
+
+  Future<void> _migrateInsduV10(Database db) async {
+    await _addColumnIfMissing(db, DatabaseHelper.woInsduTable, 'jurusan_terpasang', 'INTEGER');
+    await _addColumnIfMissing(db, DatabaseHelper.woInsduTable, 'jurusan_terpakai', 'INTEGER');
+    await _addColumnIfMissing(db, DatabaseHelper.woInsduTable, 'koordinat_penginputan_wbp', "TEXT NOT NULL DEFAULT ''");
+    await _addColumnIfMissing(db, DatabaseHelper.woInsduTable, 'jarak_gardu_petugas_wbp', 'REAL');
+    await _addColumnIfMissing(db, DatabaseHelper.woInsduTable, 'koordinat_penginputan_lwbp', "TEXT NOT NULL DEFAULT ''");
+    await _addColumnIfMissing(db, DatabaseHelper.woInsduTable, 'jarak_gardu_petugas_lwbp', 'REAL');
   }
 
   Future<void> _addColumnIfMissing(Database db, String table, String column, String definition) async {
@@ -162,7 +168,8 @@ class SqliteService {
       final batch = txn.batch();
       for (final user in users) {
         final values = user.toMap()..remove('id');
-        values['updated_at'] = now; values['created_at'] = now;
+        values['updated_at'] = now;
+        values['created_at'] = now;
         batch.insert('user_app_mobile', values, conflictAlgorithm: ConflictAlgorithm.replace);
       }
       await batch.commit(noResult: true);
@@ -181,13 +188,28 @@ class SqliteService {
     return ((result.first['total'] as int?) ?? 0) > 0;
   }
 
-  Future<void> close() async { await _database?.close(); _database = null; }
+  Future<void> close() async {
+    await _database?.close();
+    _database = null;
+  }
 
   LocalUser _fromMap(Map<String, Object?> row) => LocalUser(
-    id: row['id'] as int?, remoteNo: '${row['remote_no'] ?? ''}', kodeUiw: '${row['kode_uiw'] ?? ''}',
-    kodeUp3: '${row['kode_up3'] ?? ''}', kodeUlp: '${row['kode_ulp'] ?? ''}', ulp: '${row['ulp'] ?? ''}',
-    username: '${row['username'] ?? ''}', passwordHash: '${row['password_hash'] ?? ''}', passwordSalt: '${row['password_salt'] ?? ''}',
-    role: '${row['role'] ?? ''}', bidang: '${row['bidang'] ?? ''}', tim: '${row['tim'] ?? ''}', subTim: '${row['sub_tim'] ?? ''}',
-    aksesMenu: '${row['akses_menu'] ?? ''}', isActive: row['is_active'] == 1, sourceUpdatedAt: row['source_updated_at']?.toString(), syncedAt: '${row['synced_at'] ?? ''}',
-  );
+        id: row['id'] as int?,
+        remoteNo: '${row['remote_no'] ?? ''}',
+        kodeUiw: '${row['kode_uiw'] ?? ''}',
+        kodeUp3: '${row['kode_up3'] ?? ''}',
+        kodeUlp: '${row['kode_ulp'] ?? ''}',
+        ulp: '${row['ulp'] ?? ''}',
+        username: '${row['username'] ?? ''}',
+        passwordHash: '${row['password_hash'] ?? ''}',
+        passwordSalt: '${row['password_salt'] ?? ''}',
+        role: '${row['role'] ?? ''}',
+        bidang: '${row['bidang'] ?? ''}',
+        tim: '${row['tim'] ?? ''}',
+        subTim: '${row['sub_tim'] ?? ''}',
+        aksesMenu: '${row['akses_menu'] ?? ''}',
+        isActive: row['is_active'] == 1,
+        sourceUpdatedAt: row['source_updated_at']?.toString(),
+        syncedAt: '${row['synced_at'] ?? ''}',
+      );
 }
