@@ -1,16 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../models/har_execution.dart';
-import '../../models/wo_insdu.dart';
-import '../../models/wo_insjar.dart';
-import '../../models/wo_row.dart';
 import '../../services/network_status_service.dart';
-import '../../services/wo_insdu_repository.dart';
-import '../../services/wo_insjar_repository.dart';
-import '../../services/wo_row_repository.dart';
 import '../../theme/kopitiam_theme.dart';
 import 'welcome_coffee_mark.dart';
-import 'wo_summary_card.dart';
 
 typedef NetworkProbe = Future<bool> Function();
 
@@ -28,27 +20,12 @@ class _WelcomeCardState extends State<WelcomeCard>
     with WidgetsBindingObserver {
   bool? _online;
   bool _checking = false;
-  bool _loading = false;
-  int _total = 0;
-  int _waiting = 0;
-  int _progress = 0;
-  int _done = 0;
-
-  String get _identity =>
-      '${widget.sesi['subTim'] ?? widget.sesi['tim'] ?? ''} '
-              '${widget.sesi['username'] ?? ''}'
-          .toLowerCase();
-  bool get _isInsdu =>
-      _identity.contains('inspeksi gardu') || _identity.contains('insdu');
-  bool get _isRow => !_isInsdu && _identity.contains('row');
-  bool get _showSummary => HarExecution.allowedTypes(widget.sesi).isEmpty;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _checkNetwork();
-    _loadSummary();
   }
 
   @override
@@ -59,10 +36,7 @@ class _WelcomeCardState extends State<WelcomeCard>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _checkNetwork();
-      _loadSummary();
-    }
+    if (state == AppLifecycleState.resumed) _checkNetwork();
   }
 
   Future<void> _checkNetwork() async {
@@ -74,78 +48,6 @@ class _WelcomeCardState extends State<WelcomeCard>
       if (mounted && online != _online) setState(() => _online = online);
     } finally {
       _checking = false;
-    }
-  }
-
-  Future<void> _loadSummary() async {
-    if (!_showSummary || _loading) return;
-    _loading = true;
-    try {
-      final values = <int>[0, 0, 0, 0];
-      if (_isInsdu) {
-        final items = await WoInsduRepository().semua();
-        values[0] = items.length;
-        values[1] = items
-            .where((item) =>
-                WoInsdu.normalisasiStatus(item.statusWo) ==
-                WoInsdu.statusMulai)
-            .length;
-        values[2] = items
-            .where((item) =>
-                WoInsdu.normalisasiStatus(item.statusWo) ==
-                WoInsdu.statusDalam)
-            .length;
-        values[3] = items
-            .where((item) =>
-                WoInsdu.normalisasiStatus(item.statusWo) ==
-                WoInsdu.statusSelesai)
-            .length;
-      } else if (_isRow) {
-        final items = await WoRowRepository().semua();
-        values[0] = items.length;
-        values[1] = items
-            .where((item) =>
-                WoRow.normalisasiStatus(item.statusWo) ==
-                WoRow.statusPenugasan)
-            .length;
-        values[2] = items
-            .where((item) =>
-                WoRow.normalisasiStatus(item.statusWo) ==
-                WoRow.statusProgress)
-            .length;
-        values[3] = items
-            .where((item) =>
-                WoRow.normalisasiStatus(item.statusWo) == WoRow.statusSelesai)
-            .length;
-      } else {
-        final items = await WoInsjarRepository().semua();
-        values[0] = items.length;
-        values[1] = items
-            .where((item) =>
-                WoInsjar.normalisasiStatus(item.statusWo) ==
-                WoInsjar.statusMulai)
-            .length;
-        values[2] = items
-            .where((item) =>
-                WoInsjar.normalisasiStatus(item.statusWo) ==
-                WoInsjar.statusDalam)
-            .length;
-        values[3] = items
-            .where((item) =>
-                WoInsjar.normalisasiStatus(item.statusWo) ==
-                WoInsjar.statusSelesai)
-            .length;
-      }
-      if (mounted) {
-        setState(() {
-          _total = values[0];
-          _waiting = values[1];
-          _progress = values[2];
-          _done = values[3];
-        });
-      }
-    } finally {
-      _loading = false;
     }
   }
 
@@ -184,34 +86,6 @@ class _WelcomeCardState extends State<WelcomeCard>
     final ulp = '${widget.sesi['ulp'] ?? '-'}';
     final bidang =
         '${widget.sesi['bidang'] ?? widget.sesi['Bidang'] ?? '-'}';
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _welcome(team, ulp, bidang),
-        if (_showSummary) ...[
-          const SizedBox(height: 16),
-          if (_loading && _total == 0)
-            const LinearProgressIndicator()
-          else if (_isRow)
-            WoSummaryCard.row(
-              total: _total,
-              penugasan: _waiting,
-              progress: _progress,
-              selesai: _done,
-            )
-          else
-            WoSummaryCard.insjar(
-              total: _total,
-              menunggu: _waiting,
-              sedang: _progress,
-              selesai: _done,
-            ),
-        ],
-      ],
-    );
-  }
-
-  Widget _welcome(String team, String ulp, String bidang) {
     final online = _online == true
         ? 'ONLINE'
         : _online == false
@@ -242,7 +116,9 @@ class _WelcomeCardState extends State<WelcomeCard>
       child: Stack(
         children: [
           const Positioned.fill(
-            child: IgnorePointer(child: CustomPaint(painter: _GoldOrbitPainter())),
+            child: IgnorePointer(
+              child: CustomPaint(painter: _GoldOrbitPainter()),
+            ),
           ),
           const Positioned(
             left: 56,
