@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+// UI fixes in this branch are validated by Flutter CI before merge.
 import '../models/wo_har_jar.dart';
 import '../models/wo_insdu.dart';
 import '../models/wo_insjar.dart';
