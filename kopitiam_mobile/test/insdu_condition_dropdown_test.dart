@@ -40,9 +40,9 @@ void main() {
     await tester.pumpAndSettle();
 
     final scrollable = find.descendant(
-      of: find.byType(ListView),
+      of: find.byType(ListView).first,
       matching: find.byType(Scrollable),
-    );
+    ).first;
     expect(find.text('01'), findsOneWidget);
     expect(find.text('Identitas Gardu'), findsOneWidget);
     expect(find.text('Pengukuran WBP'), findsOneWidget);
