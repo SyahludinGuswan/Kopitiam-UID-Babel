@@ -69,11 +69,6 @@ class _WoInsjarFormScreenState extends State<WoInsjarFormScreen> {
     );
   }
 
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
   String get _duration {
     if (_mulai == null || _selesai == null) {
       return _wo?.durasiPekerjaan.isNotEmpty == true
@@ -189,7 +184,6 @@ class _WoInsjarFormScreenState extends State<WoInsjarFormScreen> {
     if (item == null) {
       return const Scaffold(body: Center(child: Text('WO tidak ditemukan.')));
     }
-
     return Scaffold(
       backgroundColor: page,
       appBar: AppBar(
@@ -205,19 +199,29 @@ class _WoInsjarFormScreenState extends State<WoInsjarFormScreen> {
           _hero(item),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
               children: [
-                _sectionTitle('01', 'Area inspeksi', 'Ruang kerja yang ditugaskan'),
-                _areaSection(item),
-                const SizedBox(height: 20),
-                _sectionTitle('02', 'Koordinat pekerjaan', 'Kunci lokasi dengan GPS perangkat'),
-                _coordinateSection(),
-                const SizedBox(height: 20),
-                _sectionTitle('03', 'Temuan inspeksi', 'Catat kondisi yang ditemukan di lapangan'),
-                _findingsSection(item),
-                const SizedBox(height: 20),
-                _sectionTitle('04', 'Ringkasan pekerjaan', 'Periksa sebelum menyimpan progress'),
-                _summarySection(),
+                _sectionCard('01', 'Area inspeksi', _areaSection(item)),
+                const SizedBox(height: 16),
+                _sectionCard(
+                  '02',
+                  'Koordinat pekerjaan',
+                  _coordinateSection(),
+                  contentPadding: EdgeInsets.zero,
+                ),
+                const SizedBox(height: 16),
+                _sectionCard(
+                  '03',
+                  'Temuan inspeksi',
+                  _findingsSection(item),
+                  contentPadding: EdgeInsets.zero,
+                ),
+                const SizedBox(height: 16),
+                _sectionCard(
+                  '04',
+                  'Ringkasan pekerjaan',
+                  _summarySection(),
+                ),
               ],
             ),
           ),
@@ -246,7 +250,9 @@ class _WoInsjarFormScreenState extends State<WoInsjarFormScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2.4),
                         )
                       : Text(
-                          _readyToComplete ? 'Simpan & Selesaikan WO' : 'Simpan Progress',
+                          _readyToComplete
+                              ? 'Simpan & Selesaikan WO'
+                              : 'Simpan Progress',
                           style: const TextStyle(fontWeight: FontWeight.w900),
                         ),
                 ),
@@ -316,94 +322,106 @@ class _WoInsjarFormScreenState extends State<WoInsjarFormScreen> {
         ),
       );
 
-  Widget _sectionTitle(String number, String title, String subtitle) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Row(
+  Widget _sectionCard(
+    String number,
+    String title,
+    Widget child, {
+    EdgeInsets contentPadding = const EdgeInsets.all(16),
+  }) =>
+      Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: line),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x10071F33),
+              blurRadius: 20,
+              offset: Offset(0, 7),
+            ),
+          ],
+        ),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              number,
-              style: const TextStyle(
-                color: ocean,
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.1,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 17, 18, 14),
+              child: Row(
                 children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF3CD),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: gold),
+                    ),
+                    child: Text(
+                      number,
+                      style: const TextStyle(
+                        color: Color(0xFF92400E),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   Text(
                     title,
                     style: const TextStyle(
                       color: navy,
-                      fontSize: 17,
+                      fontSize: 15,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  Text(subtitle, style: const TextStyle(color: muted, fontSize: 12)),
                 ],
               ),
             ),
-          ],
-        ),
-      );
-
-  Widget _surface({required Widget child, EdgeInsets padding = const EdgeInsets.all(16)}) => Container(
-        padding: padding,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: line),
-        ),
-        child: child,
-      );
-
-  Widget _areaSection(WoInsjar item) => _surface(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _fieldLabel('Penyulang'),
-            _fieldValue(item.penyulang),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(child: _fieldPair('Section awal', item.sectionAwal)),
-                const SizedBox(width: 12),
-                Expanded(child: _fieldPair('Section akhir', item.sectionAkhir)),
-              ],
-            ),
-            const SizedBox(height: 14),
-            _fieldLabel('Section pekerjaan'),
-            _fieldValue(item.section),
-          ],
-        ),
-      );
-
-  Widget _coordinateSection() => _surface(
-        padding: EdgeInsets.zero,
-        child: Column(
-          children: [
-            _coordinateRow(
-              title: 'Titik awal pekerjaan',
-              fix: _awal,
-              loading: _gettingAwal,
-              start: true,
-              accuracy: _awalSearchAccuracy,
-            ),
             const Divider(height: 1),
-            _coordinateRow(
-              title: 'Titik akhir pekerjaan',
-              fix: _akhir,
-              loading: _gettingAkhir,
-              start: false,
-              accuracy: _akhirSearchAccuracy,
-            ),
+            Padding(padding: contentPadding, child: child),
           ],
         ),
+      );
+
+  Widget _areaSection(WoInsjar item) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _fieldLabel('Penyulang'),
+          _fieldValue(item.penyulang),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: _fieldPair('Section awal', item.sectionAwal)),
+              const SizedBox(width: 12),
+              Expanded(child: _fieldPair('Section akhir', item.sectionAkhir)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _fieldLabel('Section pekerjaan'),
+          _fieldValue(item.section),
+        ],
+      );
+
+  Widget _coordinateSection() => Column(
+        children: [
+          _coordinateRow(
+            title: 'Titik awal pekerjaan',
+            fix: _awal,
+            loading: _gettingAwal,
+            start: true,
+            accuracy: _awalSearchAccuracy,
+          ),
+          const Divider(height: 1),
+          _coordinateRow(
+            title: 'Titik akhir pekerjaan',
+            fix: _akhir,
+            loading: _gettingAkhir,
+            start: false,
+            accuracy: _akhirSearchAccuracy,
+          ),
+        ],
       );
 
   Widget _coordinateRow({
@@ -423,7 +441,6 @@ class _WoInsjarFormScreenState extends State<WoInsjarFormScreen> {
                 ? 'Ambil titik awal terlebih dahulu'
                 : 'Belum direkam'
             : 'Akurasi ${fix.accuracyLabel}';
-
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 180),
       opacity: locked ? .55 : 1,
@@ -437,7 +454,10 @@ class _WoInsjarFormScreenState extends State<WoInsjarFormScreen> {
                 Expanded(
                   child: Text(
                     title,
-                    style: const TextStyle(color: navy, fontWeight: FontWeight.w900),
+                    style: const TextStyle(
+                      color: navy,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
                 if (_readOnly || locked)
@@ -447,7 +467,11 @@ class _WoInsjarFormScreenState extends State<WoInsjarFormScreen> {
             const SizedBox(height: 8),
             Text(
               fix?.coordinate ?? '-',
-              style: const TextStyle(color: ocean, fontSize: 13, fontWeight: FontWeight.w800),
+              style: const TextStyle(
+                color: ocean,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
             ),
             const SizedBox(height: 5),
             Text(
@@ -463,7 +487,9 @@ class _WoInsjarFormScreenState extends State<WoInsjarFormScreen> {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: loading || _saving || locked ? null : () => _getCoordinate(start),
+                  onPressed: loading || _saving || locked
+                      ? null
+                      : () => _getCoordinate(start),
                   icon: loading
                       ? const SizedBox(
                           width: 17,
@@ -471,7 +497,11 @@ class _WoInsjarFormScreenState extends State<WoInsjarFormScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2.2),
                         )
                       : const Icon(Icons.my_location_rounded),
-                  label: Text(loading ? 'Mencari titik...' : 'Ambil koordinat perangkat'),
+                  label: Text(
+                    loading
+                        ? 'Mencari titik...'
+                        : 'Ambil koordinat perangkat',
+                  ),
                 ),
               ),
             ],
@@ -481,53 +511,64 @@ class _WoInsjarFormScreenState extends State<WoInsjarFormScreen> {
     );
   }
 
-  Widget _findingsSection(WoInsjar item) => _surface(
-        padding: EdgeInsets.zero,
-        child: SizedBox(
-          height: 390,
-          child: TemuanTab(
-            key: ValueKey('temuan-${item.kodeWo}'),
-            wo: item,
-            sesi: widget.sesi,
-            canAddTemuan: _awal != null,
-          ),
+  Widget _findingsSection(WoInsjar item) => SizedBox(
+        height: 390,
+        child: TemuanTab(
+          key: ValueKey('temuan-${item.kodeWo}'),
+          wo: item,
+          sesi: widget.sesi,
+          canAddTemuan: _awal != null,
         ),
       );
 
-  Widget _summarySection() => _surface(
-        child: Column(
-          children: [
-            _summaryRow('Realisasi kmS', '${_kms.toStringAsFixed(3)} km'),
-            const Divider(height: 22),
-            _summaryRow('Waktu mulai', _mulai == null ? '-' : WoInsjar.stampLengkap(_mulai!)),
-            const Divider(height: 22),
-            _summaryRow('Waktu selesai', _selesai == null ? '-' : WoInsjar.stampLengkap(_selesai!)),
-            const Divider(height: 22),
-            _summaryRow('Durasi pekerjaan', _duration),
-            const Divider(height: 22),
-            _summaryRow('Status WO', _status),
-            if (_readOnly) ...[
-              const SizedBox(height: 14),
-              const Row(
-                children: [
-                  Icon(Icons.lock_rounded, size: 17, color: Color(0xFF047857)),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'WO selesai. Data hanya dapat dilihat.',
-                      style: TextStyle(color: Color(0xFF047857), fontWeight: FontWeight.w700),
+  Widget _summarySection() => Column(
+        children: [
+          _summaryRow('Realisasi kmS', '${_kms.toStringAsFixed(3)} km'),
+          const Divider(height: 22),
+          _summaryRow(
+            'Waktu mulai',
+            _mulai == null ? '-' : WoInsjar.stampLengkap(_mulai!),
+          ),
+          const Divider(height: 22),
+          _summaryRow(
+            'Waktu selesai',
+            _selesai == null ? '-' : WoInsjar.stampLengkap(_selesai!),
+          ),
+          const Divider(height: 22),
+          _summaryRow('Durasi pekerjaan', _duration),
+          const Divider(height: 22),
+          _summaryRow('Status WO', _status),
+          if (_readOnly) ...[
+            const SizedBox(height: 14),
+            const Row(
+              children: [
+                Icon(Icons.lock_rounded, size: 17, color: Color(0xFF047857)),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'WO selesai. Data hanya dapat dilihat.',
+                    style: TextStyle(
+                      color: Color(0xFF047857),
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ],
-        ),
+        ],
       );
 
   Widget _fieldLabel(String text) => Padding(
         padding: const EdgeInsets.only(bottom: 6),
-        child: Text(text, style: const TextStyle(color: muted, fontSize: 12, fontWeight: FontWeight.w800)),
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: muted,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
       );
 
   Widget _fieldValue(String value) => Container(
@@ -537,7 +578,10 @@ class _WoInsjarFormScreenState extends State<WoInsjarFormScreen> {
           color: const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Text(value.isEmpty ? '-' : value, style: const TextStyle(color: navy, fontWeight: FontWeight.w700)),
+        child: Text(
+          value.isEmpty ? '-' : value,
+          style: const TextStyle(color: navy, fontWeight: FontWeight.w700),
+        ),
       );
 
   Widget _fieldPair(String label, String value) => Column(
@@ -550,14 +594,21 @@ class _WoInsjarFormScreenState extends State<WoInsjarFormScreen> {
         children: [
           SizedBox(
             width: 122,
-            child: Text(label, style: const TextStyle(color: muted, fontSize: 12)),
+            child: Text(
+              label,
+              style: const TextStyle(color: muted, fontSize: 12),
+            ),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               value,
               textAlign: TextAlign.right,
-              style: const TextStyle(color: navy, fontSize: 13, fontWeight: FontWeight.w900),
+              style: const TextStyle(
+                color: navy,
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ],
