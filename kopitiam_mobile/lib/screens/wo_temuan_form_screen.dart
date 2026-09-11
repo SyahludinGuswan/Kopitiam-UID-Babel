@@ -68,10 +68,37 @@ class _WoTemuanFormScreenState extends State<WoTemuanFormScreen> {
     return '';
   }
 
+  bool _sameTier(String rowTier) {
+    if (_tier == null) return false;
+    if (rowTier.trim().isEmpty) return true;
+    final selected = _clean(_tier!);
+    final candidate = _clean(rowTier);
+    return candidate == selected ||
+        candidate == selected.replaceFirst('tier', '') ||
+        'tier$candidate' == selected;
+  }
+
+  bool _matchesObject(String value) {
+    final candidate = _clean(value);
+    if (candidate.isEmpty) return true;
+    if (_object.toLowerCase() == 'jaringan') {
+      if (candidate.contains('gardu') &&
+          !candidate.contains('jaringan')) {
+        return false;
+      }
+      return candidate.contains('jaringan') ||
+          candidate.contains('insjar') ||
+          candidate.contains('saluran') ||
+          candidate.contains('line') ||
+          candidate.contains('jtm') ||
+          candidate.contains('jtr');
+    }
+    return candidate.contains('gardu') || candidate.contains('trafo');
+  }
+
   List<String> get _temuanOptions {
     if (_tier == null) return const [];
-    final target = _object.toLowerCase();
-    return _masterTemuan.where((row) {
+    final values = _masterTemuan.where((row) {
       final object = _find(row, const [
         'Object Inspeksi',
         'Objek Inspeksi',
@@ -80,26 +107,20 @@ class _WoTemuanFormScreenState extends State<WoTemuanFormScreen> {
         'Jenis Object',
         'Jenis Objek',
         'Kategori',
-      ]).toLowerCase();
-      if (object.isEmpty) return false;
-      if (target == 'jaringan' &&
-          !object.contains('jaringan') &&
-          !object.contains('jar') &&
-          !object.contains('line') &&
-          !object.contains('saluran')) {
-        return false;
-      }
-      if (target == 'gardu' &&
-          !object.contains('gardu') &&
-          !object.contains('trafo')) {
-        return false;
-      }
-      final tier = _find(row, const ['Tier']);
-      return tier.isEmpty || tier.toLowerCase() == _tier!.toLowerCase();
-    }).map((row) => _find(row, const ['Temuan', 'Nama Temuan']))
+      ]);
+      final tier = _find(row, const ['Tier', 'Tingkat', 'Level']);
+      return _matchesObject(object) && _sameTier(tier);
+    }).map((row) => _find(row, const [
+          'Temuan',
+          'Nama Temuan',
+          'Jenis Temuan',
+          'Uraian Temuan',
+        ]))
       .where((value) => value.isNotEmpty)
       .toSet()
-      .toList();
+      .toList()
+      ..sort();
+    return values;
   }
 
   List<String> get _pohonOptions => _masterPohon
@@ -239,7 +260,9 @@ class _WoTemuanFormScreenState extends State<WoTemuanFormScreen> {
   Future<void> _save() async {
     if (_saving || _capturing || _gettingGps || _loading) return;
     if (_loadError != null) return _message(_loadError!);
-    if (_segmen.text.trim().isEmpty) return _message('Isi Segmen terlebih dahulu.');
+    if (_segmen.text.trim().isEmpty) {
+      return _message('Isi Segmen terlebih dahulu.');
+    }
     if (_tier == null) return _message('Pilih Tier terlebih dahulu.');
     if (_temuan == null || !_temuanOptions.contains(_temuan)) {
       return _message('Pilih Temuan dari master data.');
@@ -611,115 +634,124 @@ class _WoTemuanFormScreenState extends State<WoTemuanFormScreen> {
         ),
       );
 
-  Widget _classificationCard() => _section(
-        2,
-        'Klasifikasi Temuan',
-        Column(
-          children: [
-            _read('JENIS OBJECT', _object),
-            const SizedBox(height: 12),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    key: ValueKey('tier-$_tier'),
-                    initialValue: _tier,
-                    decoration: _decoration('Tier *'),
-                    items: const [
-                      DropdownMenuItem(value: 'Tier 1', child: Text('Tier 1')),
-                      DropdownMenuItem(value: 'Tier 2', child: Text('Tier 2')),
-                    ],
-                    onChanged: (value) => setState(() {
-                      _tier = value;
-                      _temuan = null;
+  Widget _classificationCard() {
+    final options = _temuanOptions;
+    return _section(
+      2,
+      'Klasifikasi Temuan',
+      Column(
+        children: [
+          _read('JENIS OBJECT', _object),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  key: ValueKey('tier-$_tier'),
+                  initialValue: _tier,
+                  decoration: _decoration('Tier *'),
+                  items: const [
+                    DropdownMenuItem(value: 'Tier 1', child: Text('Tier 1')),
+                    DropdownMenuItem(value: 'Tier 2', child: Text('Tier 2')),
+                  ],
+                  onChanged: (value) => setState(() {
+                    _tier = value;
+                    _temuan = null;
+                    _pohon = null;
+                    _jarak.clear();
+                    _tinggi.clear();
+                  }),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: _read('PRIORITAS', _priority)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            key: ValueKey('temuan-$_object-$_tier-$_temuan-${options.length}'),
+            initialValue: options.contains(_temuan) ? _temuan : null,
+            isExpanded: true,
+            decoration: _decoration('Temuan *'),
+            hint: Text(
+              _tier == null
+                  ? 'Pilih Tier dahulu'
+                  : options.isEmpty
+                      ? 'Data Temuan tidak tersedia'
+                      : 'Pilih Temuan',
+            ),
+            items: options
+                .map((value) => DropdownMenuItem(
+                      value: value,
+                      child: Text(value, overflow: TextOverflow.ellipsis),
+                    ))
+                .toList(),
+            onChanged: _tier == null || options.isEmpty
+                ? null
+                : (value) => setState(() {
+                      _temuan = value;
                       _pohon = null;
                       _jarak.clear();
                       _tinggi.clear();
                     }),
+          ),
+          if (_isRow) ...[
+            const SizedBox(height: 16),
+            const Divider(height: 1),
+            const SizedBox(height: 16),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Kriteria ROW',
+                style: TextStyle(
+                  color: KopitiamColors.ocean,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _jarak,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (_) => setState(() {}),
+                    decoration: _decoration('Jarak jaringan (m) *'),
                   ),
                 ),
                 const SizedBox(width: 10),
-                Expanded(child: _read('PRIORITAS', _priority)),
+                Expanded(
+                  child: TextField(
+                    controller: _tinggi,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (_) => setState(() {}),
+                    decoration: _decoration('Tinggi pohon (m) *'),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              key: ValueKey('temuan-$_object-$_tier-$_temuan'),
-              initialValue: _temuanOptions.contains(_temuan) ? _temuan : null,
+              key: ValueKey('pohon-$_pohon'),
+              initialValue: _pohonOptions.contains(_pohon) ? _pohon : null,
               isExpanded: true,
-              decoration: _decoration('Temuan *'),
-              hint: Text(_tier == null ? 'Pilih Tier dahulu' : 'Pilih Temuan'),
-              items: _temuanOptions
-                  .map((value) => DropdownMenuItem(
-                        value: value,
-                        child: Text(value, overflow: TextOverflow.ellipsis),
-                      ))
+              decoration: _decoration('Jenis Pohon *'),
+              items: _pohonOptions
+                  .map((value) =>
+                      DropdownMenuItem(value: value, child: Text(value)))
                   .toList(),
-              onChanged: _tier == null
-                  ? null
-                  : (value) => setState(() {
-                        _temuan = value;
-                        _pohon = null;
-                        _jarak.clear();
-                        _tinggi.clear();
-                      }),
+              onChanged: (value) => setState(() => _pohon = value),
             ),
-            if (_isRow) ...[
-              const SizedBox(height: 16),
-              const Divider(height: 1),
-              const SizedBox(height: 16),
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Kriteria ROW',
-                  style: TextStyle(
-                    color: KopitiamColors.ocean,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _jarak,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      onChanged: (_) => setState(() {}),
-                      decoration: _decoration('Jarak jaringan (m) *'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: _tinggi,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      onChanged: (_) => setState(() {}),
-                      decoration: _decoration('Tinggi pohon (m) *'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                key: ValueKey('pohon-$_pohon'),
-                initialValue: _pohonOptions.contains(_pohon) ? _pohon : null,
-                isExpanded: true,
-                decoration: _decoration('Jenis Pohon *'),
-                items: _pohonOptions
-                    .map((value) =>
-                        DropdownMenuItem(value: value, child: Text(value)))
-                    .toList(),
-                onChanged: (value) => setState(() => _pohon = value),
-              ),
-            ],
           ],
-        ),
-      );
+        ],
+      ),
+    );
+  }
 
   Widget _coordinateCard() => _section(
         3,
