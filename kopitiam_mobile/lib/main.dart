@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/login_screen.dart';
 import 'screens/startup_screen.dart';
-import 'services/api_activity.dart';
 import 'services/api_service.dart';
 import 'services/device_session_service.dart';
 import 'services/local_auth_service.dart';
@@ -18,6 +17,7 @@ void main() => runApp(const KopitiamApp());
 
 class KopitiamApp extends StatelessWidget {
   const KopitiamApp({super.key});
+
   @override
   Widget build(BuildContext context) => MaterialApp(
         navigatorKey: appNavigatorKey,
@@ -31,11 +31,15 @@ class KopitiamApp extends StatelessWidget {
 
 class _SessionGuard extends StatefulWidget {
   final Widget child;
+
   const _SessionGuard({required this.child});
-  @override State<_SessionGuard> createState() => _SessionGuardState();
+
+  @override
+  State<_SessionGuard> createState() => _SessionGuardState();
 }
 
-class _SessionGuardState extends State<_SessionGuard> with WidgetsBindingObserver {
+class _SessionGuardState extends State<_SessionGuard>
+    with WidgetsBindingObserver {
   Timer? _timer;
   bool _checking = false;
   bool _mockLocationBlocked = false;
@@ -44,7 +48,10 @@ class _SessionGuardState extends State<_SessionGuard> with WidgetsBindingObserve
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _timer = Timer.periodic(const Duration(minutes: 1), (_) => _securityCheck());
+    _timer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _securityCheck(),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) => _securityCheck());
   }
 
@@ -62,7 +69,9 @@ class _SessionGuardState extends State<_SessionGuard> with WidgetsBindingObserve
         await _forceLogoutForMockLocation();
         return;
       }
-      if (_mockLocationBlocked && mockResult == MockLocationCheck.trusted && mounted) {
+      if (_mockLocationBlocked &&
+          mockResult == MockLocationCheck.trusted &&
+          mounted) {
         setState(() => _mockLocationBlocked = false);
       }
       await _enforceOfflineExpiry();
@@ -83,19 +92,31 @@ class _SessionGuardState extends State<_SessionGuard> with WidgetsBindingObserve
     await prefs.clear();
     if (!mounted) return;
     setState(() => _mockLocationBlocked = true);
-    appNavigatorKey.currentState?.pushAndRemoveUntil(MaterialPageRoute<void>(builder: (_) => const LoginScreen()), (_) => false);
+    appNavigatorKey.currentState?.pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
+      (_) => false,
+    );
   }
 
   Future<void> _enforceOfflineExpiry() async {
     final prefs = await SharedPreferences.getInstance();
     final offline = prefs.getBool('offlineLogin') ?? false;
-    final expiresAt = DateTime.tryParse(prefs.getString('offlineExpiresAt') ?? '')?.toUtc();
-    if (!offline || (expiresAt != null && DateTime.now().toUtc().isBefore(expiresAt))) return;
+    final expiresAt = DateTime.tryParse(
+      prefs.getString('offlineExpiresAt') ?? '',
+    )?.toUtc();
+    if (!offline ||
+        (expiresAt != null &&
+            DateTime.now().toUtc().isBefore(expiresAt))) {
+      return;
+    }
     await DeviceSessionService.clear();
     await LocalAuthService.clear();
     await prefs.clear();
     if (!mounted) return;
-    appNavigatorKey.currentState?.pushAndRemoveUntil(MaterialPageRoute<void>(builder: (_) => const LoginScreen()), (_) => false);
+    appNavigatorKey.currentState?.pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
+      (_) => false,
+    );
   }
 
   @override
@@ -106,52 +127,28 @@ class _SessionGuardState extends State<_SessionGuard> with WidgetsBindingObserve
   }
 
   @override
-  Widget build(BuildContext context) => Stack(children: [
-        AbsorbPointer(absorbing: _mockLocationBlocked, child: widget.child),
-        ValueListenableBuilder<ApiActivityState?>(
-          valueListenable: ApiActivity.current,
-          builder: (_, activity, __) => activity == null ? const SizedBox.shrink() : _ApiProgressOverlay(activity: activity),
-        ),
-        if (_mockLocationBlocked)
-          Positioned(left: 20, right: 20, top: MediaQuery.paddingOf(context).top + 72, child: _MockLocationWarning(onRetry: _securityCheck)),
-      ]);
-}
-
-class _ApiProgressOverlay extends StatelessWidget {
-  final ApiActivityState activity;
-  const _ApiProgressOverlay({required this.activity});
-
-  @override
-  Widget build(BuildContext context) => Positioned.fill(
-        child: Material(
-          color: KopitiamColors.scrim,
-          child: AbsorbPointer(
-            child: Center(
-              child: Container(
-                width: 260,
-                padding: const EdgeInsets.fromLTRB(24, 26, 24, 22),
-                decoration: BoxDecoration(
-                  color: KopitiamColors.surface,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: const [BoxShadow(color: Color(0x3D071F33), blurRadius: 32, offset: Offset(0, 16))],
-                ),
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  const KopitiamLoading(size: 66),
-                  const SizedBox(height: 18),
-                  Text(activity.label, textAlign: TextAlign.center, style: const TextStyle(color: KopitiamColors.ink, fontSize: 17, fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 7),
-                  const Text('Mohon tunggu, data sedang diproses.', textAlign: TextAlign.center, style: TextStyle(color: KopitiamColors.muted, fontSize: 12)),
-                ]),
-              ),
-            ),
+  Widget build(BuildContext context) => Stack(
+        children: [
+          AbsorbPointer(
+            absorbing: _mockLocationBlocked,
+            child: widget.child,
           ),
-        ),
+          if (_mockLocationBlocked)
+            Positioned(
+              left: 20,
+              right: 20,
+              top: MediaQuery.paddingOf(context).top + 72,
+              child: _MockLocationWarning(onRetry: _securityCheck),
+            ),
+        ],
       );
 }
 
 class _MockLocationWarning extends StatelessWidget {
   final Future<void> Function() onRetry;
+
   const _MockLocationWarning({required this.onRetry});
+
   @override
   Widget build(BuildContext context) => Material(
         color: Colors.transparent,
@@ -161,21 +158,66 @@ class _MockLocationWarning extends StatelessWidget {
             color: KopitiamColors.dangerSoft,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: const Color(0xFFE7AAB0)),
-            boxShadow: const [BoxShadow(color: Color(0x26071F33), blurRadius: 24, offset: Offset(0, 10))],
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x26071F33),
+                blurRadius: 24,
+                offset: Offset(0, 10),
+              ),
+            ],
           ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Icon(Icons.gps_off_rounded, color: KopitiamColors.danger, size: 28),
-              SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Lokasi tiruan terdeteksi', style: TextStyle(color: KopitiamColors.ink, fontSize: 17, fontWeight: FontWeight.w800)),
-                SizedBox(height: 5),
-                Text('Sesi dihentikan. Matikan aplikasi pengubah lokasi sebelum masuk kembali.', style: TextStyle(color: KopitiamColors.muted, height: 1.4, fontSize: 13)),
-              ])),
-            ]),
-            const SizedBox(height: 12),
-            Align(alignment: Alignment.centerRight, child: FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded, size: 18), label: const Text('Periksa ulang'), style: FilledButton.styleFrom(backgroundColor: KopitiamColors.danger))),
-          ]),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.gps_off_rounded,
+                    color: KopitiamColors.danger,
+                    size: 28,
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Lokasi tiruan terdeteksi',
+                          style: TextStyle(
+                            color: KopitiamColors.ink,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        SizedBox(height: 5),
+                        Text(
+                          'Sesi dihentikan. Matikan aplikasi pengubah lokasi sebelum masuk kembali.',
+                          style: TextStyle(
+                            color: KopitiamColors.muted,
+                            height: 1.4,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Periksa ulang'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: KopitiamColors.danger,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       );
 }
