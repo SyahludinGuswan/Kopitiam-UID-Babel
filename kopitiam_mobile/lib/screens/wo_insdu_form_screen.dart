@@ -4,644 +4,185 @@ import 'package:geolocator/geolocator.dart';
 import '../models/wo_insdu.dart';
 import '../models/wo_insjar.dart';
 import '../services/high_accuracy_location_service.dart';
+import '../services/temuan_repository.dart';
 import '../services/wo_insdu_repository.dart';
 import 'temuan_tab.dart';
 
 class WoInsduFormScreen extends StatefulWidget {
   final WoInsdu existing;
   final Map<String, dynamic> sesi;
-
   const WoInsduFormScreen({super.key, required this.existing, required this.sesi});
-
   @override
   State<WoInsduFormScreen> createState() => _WoInsduFormScreenState();
 }
 
 class _WoInsduFormScreenState extends State<WoInsduFormScreen> {
-  static const ocean = Color(0xFF0A3E74);
-  static const navy = Color(0xFF071B30);
-  static const gold = Color(0xFFFFAE00);
-  static const muted = Color(0xFF64748B);
-  static const line = Color(0xFFE2E8F0);
-  static const page = Color(0xFFF4F7FB);
-
+  static const blue = Color(0xFF075B96), darkBlue = Color(0xFF06325F), navy = Color(0xFF071B30);
+  static const gold = Color(0xFFFFC928), paleGold = Color(0xFFFFF4C7), cyan = Color(0xFFC8F1F8);
+  static const muted = Color(0xFF64748B), line = Color(0xFFD7E0E8), page = Color(0xFFF0F8FC);
   static const coverOptions = ['Lengkap', 'Tidak Lengkap', 'Rusak', 'Tidak ada'];
-  static const jumperOptions = [
-    'A3C',
-    'A3CS (Lengkap)',
-    'A3CS (Tidak Lengkap)',
-    'Protective Sleeve (Lengkap)',
-    'Protective Sleeve (Tidak Lengkap)',
-  ];
-
-  static const wbpLoad = <String, String>{
-    'bebanUtamaRWbp': 'R (A)',
-    'bebanUtamaSWbp': 'S (A)',
-    'bebanUtamaTWbp': 'T (A)',
-    'bebanJurusanNWbp': 'N (A)',
-  };
-  static const wbpVoltage = <String, String>{
-    'teganganRswbp': 'R-S (V)',
-    'teganganStwbp': 'S-T (V)',
-    'teganganRtwbp': 'R-T (V)',
-    'teganganRnwbp': 'R-N (V)',
-    'teganganSnwbp': 'S-N (V)',
-    'teganganTnwbp': 'T-N (V)',
-  };
-  static const lwbpLoad = <String, String>{
-    'bebanUtamaRLwbp': 'R (A)',
-    'bebanUtamaSLwbp': 'S (A)',
-    'bebanUtamaTLwbp': 'T (A)',
-    'bebanJurusanNLwbp': 'N (A)',
-  };
-  static const lwbpVoltage = <String, String>{
-    'teganganRslwbp': 'R-S (V)',
-    'teganganStlwbp': 'S-T (V)',
-    'teganganRtlwbp': 'R-T (V)',
-    'teganganRnlwbp': 'R-N (V)',
-    'teganganSnlwbp': 'S-N (V)',
-    'teganganTnlwbp': 'T-N (V)',
-  };
-  static const conditionLabels = <String, String>{
-    'coverFcoAtas': 'Cover FCO Atas',
-    'coverFcoBawah': 'Cover FCO Bawah',
-    'coverBushingTm': 'Cover Bushing TM',
-    'coverBushingTr': 'Cover Bushing TR',
-    'coverArrester': 'Cover Arrester',
-    'jumperanAtas': 'Jumperan Atas',
-    'jumperanBawah': 'Jumperan Bawah',
-  };
+  static const jumperOptions = ['A3C', 'A3CS (Lengkap)', 'A3CS (Tidak Lengkap)', 'Protective Sleeve (Lengkap)', 'Protective Sleeve (Tidak Lengkap)'];
+  static const wbpLoad = {'bebanUtamaRWbp':'FASA R','bebanUtamaSWbp':'FASA S','bebanUtamaTWbp':'FASA T','bebanJurusanNWbp':'NETRAL N'};
+  static const wbpVoltage = {'teganganRswbp':'R-S','teganganStwbp':'S-T','teganganRtwbp':'R-T','teganganRnwbp':'R-N','teganganSnwbp':'S-N','teganganTnwbp':'T-N'};
+  static const lwbpLoad = {'bebanUtamaRLwbp':'FASA R','bebanUtamaSLwbp':'FASA S','bebanUtamaTLwbp':'FASA T','bebanJurusanNLwbp':'NETRAL N'};
+  static const lwbpVoltage = {'teganganRslwbp':'R-S','teganganStlwbp':'S-T','teganganRtlwbp':'R-T','teganganRnlwbp':'R-N','teganganSnlwbp':'S-N','teganganTnlwbp':'T-N'};
+  static const conditionLabels = {'coverFcoAtas':'Cover FCO Atas','coverFcoBawah':'Cover FCO Bawah','coverBushingTm':'Cover Bushing TM','coverBushingTr':'Cover Bushing TR','coverArrester':'Cover Arrester','jumperanAtas':'Jumperan Atas','jumperanBawah':'Jumperan Bawah'};
 
   final _repo = WoInsduRepository();
+  final _temuanRepo = TemuanRepository();
   final Map<String, TextEditingController> _fields = {};
-  bool _saving = false;
-  bool _finish = false;
-  bool _gettingWbp = false;
-  bool _gettingLwbp = false;
-  double? _wbpSearchAccuracy;
-  double? _lwbpSearchAccuracy;
-  LocationFix? _wbpFix;
-  LocationFix? _lwbpFix;
-  double? _wbpDistance;
-  double? _lwbpDistance;
+  bool _saving = false, _gettingWbp = false, _gettingLwbp = false;
+  double? _wbpAccuracy, _lwbpAccuracy, _wbpDistance, _lwbpDistance;
+  LocationFix? _wbpFix, _lwbpFix;
+  String _wbpTime = '', _lwbpTime = '';
+  int _findingCount = 0;
 
   WoInsdu get wo => widget.existing;
   bool get readOnly => WoInsdu.normalisasiStatus(wo.statusWo) == WoInsdu.statusSelesai;
-  Iterable<String> get _numericKeys => [...wbpLoad.keys, ...wbpVoltage.keys, ...lwbpLoad.keys, ...lwbpVoltage.keys];
+  Iterable<String> get _numericKeys => [...wbpLoad.keys,...wbpVoltage.keys,...lwbpLoad.keys,...lwbpVoltage.keys];
 
   @override
   void initState() {
     super.initState();
-    final values = <String, Object?>{
-      'jurusanTerpasang': wo.jurusanTerpasang,
-      'jurusanTerpakai': wo.jurusanTerpakai,
-      'bebanUtamaRWbp': wo.bebanUtamaRWbp,
-      'bebanUtamaSWbp': wo.bebanUtamaSWbp,
-      'bebanUtamaTWbp': wo.bebanUtamaTWbp,
-      'bebanJurusanNWbp': wo.bebanJurusanNWbp,
-      'teganganRswbp': wo.teganganRswbp,
-      'teganganStwbp': wo.teganganStwbp,
-      'teganganRtwbp': wo.teganganRtwbp,
-      'teganganRnwbp': wo.teganganRnwbp,
-      'teganganSnwbp': wo.teganganSnwbp,
-      'teganganTnwbp': wo.teganganTnwbp,
-      'bebanUtamaRLwbp': wo.bebanUtamaRLwbp,
-      'bebanUtamaSLwbp': wo.bebanUtamaSLwbp,
-      'bebanUtamaTLwbp': wo.bebanUtamaTLwbp,
-      'bebanJurusanNLwbp': wo.bebanJurusanNLwbp,
-      'teganganRslwbp': wo.teganganRslwbp,
-      'teganganStlwbp': wo.teganganStlwbp,
-      'teganganRtlwbp': wo.teganganRtlwbp,
-      'teganganRnlwbp': wo.teganganRnlwbp,
-      'teganganSnlwbp': wo.teganganSnlwbp,
-      'teganganTnlwbp': wo.teganganTnlwbp,
-      'coverFcoAtas': wo.coverFcoAtas,
-      'coverFcoBawah': wo.coverFcoBawah,
-      'coverBushingTm': wo.coverBushingTm,
-      'coverBushingTr': wo.coverBushingTr,
-      'coverArrester': wo.coverArrester,
-      'jumperanAtas': wo.jumperanAtas,
-      'jumperanBawah': wo.jumperanBawah,
+    final values = <String,Object?>{
+      'jurusanTerpasang':wo.jurusanTerpasang,'jurusanTerpakai':wo.jurusanTerpakai,
+      'bebanUtamaRWbp':wo.bebanUtamaRWbp,'bebanUtamaSWbp':wo.bebanUtamaSWbp,'bebanUtamaTWbp':wo.bebanUtamaTWbp,'bebanJurusanNWbp':wo.bebanJurusanNWbp,
+      'teganganRswbp':wo.teganganRswbp,'teganganStwbp':wo.teganganStwbp,'teganganRtwbp':wo.teganganRtwbp,'teganganRnwbp':wo.teganganRnwbp,'teganganSnwbp':wo.teganganSnwbp,'teganganTnwbp':wo.teganganTnwbp,
+      'bebanUtamaRLwbp':wo.bebanUtamaRLwbp,'bebanUtamaSLwbp':wo.bebanUtamaSLwbp,'bebanUtamaTLwbp':wo.bebanUtamaTLwbp,'bebanJurusanNLwbp':wo.bebanJurusanNLwbp,
+      'teganganRslwbp':wo.teganganRslwbp,'teganganStlwbp':wo.teganganStlwbp,'teganganRtlwbp':wo.teganganRtlwbp,'teganganRnlwbp':wo.teganganRnlwbp,'teganganSnlwbp':wo.teganganSnlwbp,'teganganTnlwbp':wo.teganganTnlwbp,
+      'coverFcoAtas':wo.coverFcoAtas,'coverFcoBawah':wo.coverFcoBawah,'coverBushingTm':wo.coverBushingTm,'coverBushingTr':wo.coverBushingTr,'coverArrester':wo.coverArrester,'jumperanAtas':wo.jumperanAtas,'jumperanBawah':wo.jumperanBawah,
     };
     for (final entry in values.entries) {
       final raw = entry.value == null ? '' : '${entry.value}';
-      _fields[entry.key] = TextEditingController(
-        text: _numericKeys.contains(entry.key) ? raw.replaceAll('.', ',') : raw,
-      );
+      _fields[entry.key] = TextEditingController(text:_numericKeys.contains(entry.key) ? raw.replaceAll('.', ',') : raw);
     }
     _wbpFix = _parseFix(wo.koordinatPenginputanWbp);
     _lwbpFix = _parseFix(wo.koordinatPenginputanLwbp);
+    _wbpTime = wo.waktuPenginputanWbp;
+    _lwbpTime = wo.waktuPenginputanLwbp;
     _wbpDistance = wo.jarakGarduPetugasWbp;
     _lwbpDistance = wo.jarakGarduPetugasLwbp;
+    _refreshFindingCount();
   }
 
   @override
-  void dispose() {
-    for (final controller in _fields.values) {
-      controller.dispose();
-    }
-    super.dispose();
+  void dispose() { for (final controller in _fields.values) { controller.dispose(); } super.dispose(); }
+
+  Future<void> _refreshFindingCount() async {
+    final count = (await _temuanRepo.untukWo(wo.kodeWo)).length;
+    if (mounted) setState(() => _findingCount = count);
   }
 
   LocationFix? _parseFix(String value) {
     final parts = value.split(',');
     if (parts.length < 2) return null;
-    final latitude = double.tryParse(parts[0].trim());
-    final longitude = double.tryParse(parts[1].trim());
-    if (latitude == null || longitude == null) return null;
-    return LocationFix(
-      latitude: latitude,
-      longitude: longitude,
-      accuracy: 5,
-      capturedAt: DateTime.now(),
-      samples: 1,
-      locked: true,
-    );
+    final lat = double.tryParse(parts[0].trim()), lng = double.tryParse(parts[1].trim());
+    if (lat == null || lng == null) return null;
+    return LocationFix(latitude:lat,longitude:lng,accuracy:5,capturedAt:DateTime.now(),samples:1,locked:true);
   }
 
   List<double>? get _garduCoordinate {
-    final source = wo.koordinatGardu.trim().isNotEmpty
-        ? wo.koordinatGardu
-        : '${wo.lat},${wo.long}';
-    final parts = source.split(',');
+    final raw = wo.koordinatGardu.trim().isNotEmpty ? wo.koordinatGardu : '${wo.lat},${wo.long}';
+    final parts = raw.split(',');
     if (parts.length < 2) return null;
-    final latitude = double.tryParse(parts[0].trim());
-    final longitude = double.tryParse(parts[1].trim());
-    return latitude == null || longitude == null ? null : [latitude, longitude];
+    final lat = double.tryParse(parts[0].trim()), lng = double.tryParse(parts[1].trim());
+    return lat == null || lng == null ? null : [lat,lng];
   }
 
   String? _decimalError(String key) {
     final value = _fields[key]!.text.trim();
     if (value.isEmpty) return null;
     if (value.contains('.')) return 'Gunakan (,) sebagai pemisah';
-    return RegExp(r'^\d+(,\d+)?$').hasMatch(value) ? null : 'Masukkan angka yang valid';
+    return RegExp(r'^\d+(,\d+)?$').hasMatch(value) ? null : 'Angka tidak valid';
   }
-
   bool get _hasDecimalError => _numericKeys.any((key) => _decimalError(key) != null);
-  double? _number(String key) {
-    final value = _fields[key]!.text.trim().replaceAll(',', '.');
-    return value.isEmpty ? null : double.tryParse(value);
-  }
+  double? _number(String key) { final value = _fields[key]!.text.trim().replaceAll(',', '.'); return value.isEmpty ? null : double.tryParse(value); }
   int? _integer(String key) => int.tryParse(_fields[key]!.text.trim());
   String _text(String key) => _fields[key]!.text.trim();
+  bool get _complete => _integer('jurusanTerpasang') != null && _integer('jurusanTerpakai') != null && _numericKeys.every((key) => _number(key) != null) && conditionLabels.keys.every((key) => _text(key).isNotEmpty) && _wbpFix != null && _lwbpFix != null && _wbpTime.isNotEmpty && _lwbpTime.isNotEmpty;
 
-  Future<void> _captureIfNeeded(bool wbp) async {
-    if (readOnly || _saving) return;
-    if (wbp ? _wbpFix != null || _gettingWbp : _lwbpFix != null || _gettingLwbp) return;
-    setState(() {
-      if (wbp) {
-        _gettingWbp = true;
-        _wbpSearchAccuracy = null;
-      } else {
-        _gettingLwbp = true;
-        _lwbpSearchAccuracy = null;
-      }
-    });
+  Future<void> _capture(bool wbp) async {
+    if (readOnly || _saving || (wbp ? _wbpFix != null || _gettingWbp : _lwbpFix != null || _gettingLwbp)) return;
+    setState(() { if (wbp) { _gettingWbp = true; _wbpAccuracy = null; } else { _gettingLwbp = true; _lwbpAccuracy = null; } });
     try {
-      final fix = await HighAccuracyLocationService.acquire(
-        onSample: (_, accuracy) {
-          if (!mounted) return;
-          setState(() {
-            if (wbp) {
-              _wbpSearchAccuracy = accuracy;
-            } else {
-              _lwbpSearchAccuracy = accuracy;
-            }
-          });
-        },
-      );
+      final fix = await HighAccuracyLocationService.acquire(onSample:(_, accuracy) { if (!mounted) return; setState(() { if (wbp) { _wbpAccuracy = accuracy; } else { _lwbpAccuracy = accuracy; } }); });
       if (!mounted) return;
       final gardu = _garduCoordinate;
-      final distance = gardu == null
-          ? null
-          : Geolocator.distanceBetween(
-              gardu[0],
-              gardu[1],
-              fix.latitude,
-              fix.longitude,
-            );
-      setState(() {
-        if (wbp) {
-          _wbpFix = fix;
-          _wbpDistance = distance;
-        } else {
-          _lwbpFix = fix;
-          _lwbpDistance = distance;
-        }
-      });
-    } catch (error) {
-      if (mounted) _message('$error', error: true);
-    } finally {
-      if (mounted) {
-        setState(() {
-          if (wbp) {
-            _gettingWbp = false;
-          } else {
-            _gettingLwbp = false;
-          }
-        });
-      }
-    }
+      final distance = gardu == null ? null : Geolocator.distanceBetween(gardu[0], gardu[1], fix.latitude, fix.longitude);
+      final stamp = WoInsjar.stampLengkap(fix.capturedAt);
+      setState(() { if (wbp) { _wbpFix = fix; _wbpTime = stamp; _wbpDistance = distance; } else { _lwbpFix = fix; _lwbpTime = stamp; _lwbpDistance = distance; } });
+    } catch (error) { if (mounted) _message('$error', error:true); }
+    finally { if (mounted) setState(() { if (wbp) { _gettingWbp = false; } else { _gettingLwbp = false; } }); }
   }
 
-  Future<void> _save() async {
+  Future<void> _savePressed() async {
     if (_saving || readOnly) return;
-    if (_hasDecimalError) {
-      setState(() {});
-      _message('Perbaiki kolom merah. Gunakan (,) sebagai pemisah.', error: true);
-      return;
-    }
+    if (_hasDecimalError) { setState(() {}); _message('Perbaiki kolom merah. Gunakan (,) sebagai pemisah.', error:true); return; }
+    await _refreshFindingCount();
+    if (!_complete) { await _persist(false); return; }
+    if (!mounted) return;
+    final finish = await showDialog<bool>(context:context,builder:(context)=>AlertDialog(
+      shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(22)),
+      icon:const Icon(Icons.fact_check_rounded,color:blue,size:42),
+      title:const Text('Semua data sudah lengkap'),
+      content:const Text('Simpan data sekaligus selesaikan WO ini? WO yang selesai akan dikunci dan siap disinkronkan.'),
+      actions:[TextButton(onPressed:()=>Navigator.pop(context,false),child:const Text('Simpan saja')),FilledButton(onPressed:()=>Navigator.pop(context,true),style:FilledButton.styleFrom(backgroundColor:gold,foregroundColor:navy),child:const Text('Selesaikan WO'))],
+    ));
+    if (finish != null) await _persist(finish);
+  }
+
+  Future<void> _persist(bool finish) async {
     setState(() => _saving = true);
     try {
       final now = DateTime.now();
-      final start = WoInsjar.parseStamp(wo.waktuMulai) ?? now;
+      final start = WoInsjar.parseStamp(wo.waktuMulai) ?? WoInsjar.parseStamp(_wbpTime) ?? now;
       final saved = WoInsdu(
-        id: wo.id,
-        no: wo.no,
-        kodeWo: wo.kodeWo,
-        kodeUiw: wo.kodeUiw,
-        kodeUp3: wo.kodeUp3,
-        kodeUlp: wo.kodeUlp,
-        ulp: wo.ulp,
-        hari: wo.hari,
-        tanggal: wo.tanggal,
-        penyulang: wo.penyulang,
-        section: wo.section,
-        nomorGardu: wo.nomorGardu,
-        koordinatGardu: wo.koordinatGardu,
-        lat: wo.lat,
-        long: wo.long,
-        jurusan: wo.jurusan,
-        jurusanTerpasang: _integer('jurusanTerpasang'),
-        jurusanTerpakai: _integer('jurusanTerpakai'),
-        bebanUtamaRWbp: _number('bebanUtamaRWbp'),
-        bebanUtamaSWbp: _number('bebanUtamaSWbp'),
-        bebanUtamaTWbp: _number('bebanUtamaTWbp'),
-        bebanJurusanNWbp: _number('bebanJurusanNWbp'),
-        teganganRswbp: _number('teganganRswbp'),
-        teganganStwbp: _number('teganganStwbp'),
-        teganganRtwbp: _number('teganganRtwbp'),
-        teganganRnwbp: _number('teganganRnwbp'),
-        teganganSnwbp: _number('teganganSnwbp'),
-        teganganTnwbp: _number('teganganTnwbp'),
-        bebanUtamaRLwbp: _number('bebanUtamaRLwbp'),
-        bebanUtamaSLwbp: _number('bebanUtamaSLwbp'),
-        bebanUtamaTLwbp: _number('bebanUtamaTLwbp'),
-        bebanJurusanNLwbp: _number('bebanJurusanNLwbp'),
-        teganganRslwbp: _number('teganganRslwbp'),
-        teganganStlwbp: _number('teganganStlwbp'),
-        teganganRtlwbp: _number('teganganRtlwbp'),
-        teganganRnlwbp: _number('teganganRnlwbp'),
-        teganganSnlwbp: _number('teganganSnlwbp'),
-        teganganTnlwbp: _number('teganganTnlwbp'),
-        koordinatPenginputanWbp: _wbpFix?.coordinate ?? wo.koordinatPenginputanWbp,
-        jarakGarduPetugasWbp: _wbpDistance,
-        koordinatPenginputanLwbp: _lwbpFix?.coordinate ?? wo.koordinatPenginputanLwbp,
-        jarakGarduPetugasLwbp: _lwbpDistance,
-        coverFcoAtas: _text('coverFcoAtas'),
-        coverFcoBawah: _text('coverFcoBawah'),
-        coverBushingTm: _text('coverBushingTm'),
-        coverBushingTr: _text('coverBushingTr'),
-        coverArrester: _text('coverArrester'),
-        jumperanAtas: _text('jumperanAtas'),
-        jumperanBawah: _text('jumperanBawah'),
-        waktuMulai: wo.waktuMulai.isEmpty ? WoInsjar.stampLengkap(start) : wo.waktuMulai,
-        waktuSelesai: _finish ? WoInsjar.stampLengkap(now) : wo.waktuSelesai,
-        durasiPekerjaan: _finish ? WoInsjar.hitungDurasi(start, now) : wo.durasiPekerjaan,
-        statusWo: _finish ? WoInsdu.statusSelesai : WoInsdu.statusDalam,
-        isDirty: _finish,
+        id:wo.id,no:wo.no,kodeWo:wo.kodeWo,kodeUiw:wo.kodeUiw,kodeUp3:wo.kodeUp3,kodeUlp:wo.kodeUlp,ulp:wo.ulp,hari:wo.hari,tanggal:wo.tanggal,penyulang:wo.penyulang,section:wo.section,nomorGardu:wo.nomorGardu,koordinatGardu:wo.koordinatGardu,lat:wo.lat,long:wo.long,jurusan:wo.jurusan,
+        jurusanTerpasang:_integer('jurusanTerpasang'),jurusanTerpakai:_integer('jurusanTerpakai'),
+        bebanUtamaRWbp:_number('bebanUtamaRWbp'),bebanUtamaSWbp:_number('bebanUtamaSWbp'),bebanUtamaTWbp:_number('bebanUtamaTWbp'),bebanJurusanNWbp:_number('bebanJurusanNWbp'),teganganRswbp:_number('teganganRswbp'),teganganStwbp:_number('teganganStwbp'),teganganRtwbp:_number('teganganRtwbp'),teganganRnwbp:_number('teganganRnwbp'),teganganSnwbp:_number('teganganSnwbp'),teganganTnwbp:_number('teganganTnwbp'),
+        bebanUtamaRLwbp:_number('bebanUtamaRLwbp'),bebanUtamaSLwbp:_number('bebanUtamaSLwbp'),bebanUtamaTLwbp:_number('bebanUtamaTLwbp'),bebanJurusanNLwbp:_number('bebanJurusanNLwbp'),teganganRslwbp:_number('teganganRslwbp'),teganganStlwbp:_number('teganganStlwbp'),teganganRtlwbp:_number('teganganRtlwbp'),teganganRnlwbp:_number('teganganRnlwbp'),teganganSnlwbp:_number('teganganSnlwbp'),teganganTnlwbp:_number('teganganTnlwbp'),
+        koordinatPenginputanWbp:_wbpFix?.coordinate ?? '',waktuPenginputanWbp:_wbpTime,jarakGarduPetugasWbp:_wbpDistance,koordinatPenginputanLwbp:_lwbpFix?.coordinate ?? '',waktuPenginputanLwbp:_lwbpTime,jarakGarduPetugasLwbp:_lwbpDistance,
+        coverFcoAtas:_text('coverFcoAtas'),coverFcoBawah:_text('coverFcoBawah'),coverBushingTm:_text('coverBushingTm'),coverBushingTr:_text('coverBushingTr'),coverArrester:_text('coverArrester'),jumperanAtas:_text('jumperanAtas'),jumperanBawah:_text('jumperanBawah'),
+        waktuMulai:wo.waktuMulai.isEmpty ? WoInsjar.stampLengkap(start) : wo.waktuMulai,waktuSelesai:finish ? WoInsjar.stampLengkap(now) : wo.waktuSelesai,durasiPekerjaan:finish ? WoInsjar.hitungDurasi(start,now) : wo.durasiPekerjaan,statusWo:finish ? WoInsdu.statusSelesai : WoInsdu.statusDalam,isDirty:finish,
       );
-      await _repo.simpan(saved, dirty: _finish);
-      if (mounted) Navigator.pop(context, true);
-    } catch (error) {
-      if (mounted) _message('Gagal menyimpan WO: $error', error: true);
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
+      await _repo.simpan(saved,dirty:finish);
+      if (!mounted) return;
+      if (finish) await showDialog<void>(context:context,barrierDismissible:false,builder:(context)=>AlertDialog(shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(22)),icon:const Icon(Icons.check_circle_rounded,color:Color(0xFF16A34A),size:48),title:const Text('WO sudah selesai'),content:Text('Semua data Inspeksi Gardu telah disimpan dan dikunci.\n\n${wo.kodeWo}'),actions:[FilledButton(onPressed:()=>Navigator.pop(context),style:FilledButton.styleFrom(backgroundColor:gold,foregroundColor:navy),child:const Text('Tutup'))]));
+      if (mounted) Navigator.pop(context,true);
+    } catch (error) { if (mounted) _message('Gagal menyimpan WO: $error',error:true); }
+    finally { if (mounted) setState(() => _saving = false); }
   }
 
-  void _message(String text, {bool error = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(text),
-        backgroundColor: error ? Colors.red.shade700 : Colors.green.shade700,
-      ),
-    );
-  }
-
-  WoInsjar get _findingWo => WoInsjar(
-        kodeWo: wo.kodeWo,
-        kodeUiw: wo.kodeUiw,
-        kodeUp3: wo.kodeUp3,
-        kodeUlp: wo.kodeUlp,
-        ulp: wo.ulp,
-        hari: wo.hari,
-        tanggal: wo.tanggal,
-        penyulang: wo.penyulang,
-        section: wo.section,
-        statusWo: WoInsjar.statusDalam,
-      );
+  void _message(String text,{bool error=false}) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(text),backgroundColor:error?Colors.red.shade700:Colors.green.shade700));
+  WoInsjar get _findingWo => WoInsjar(kodeWo:wo.kodeWo,kodeUiw:wo.kodeUiw,kodeUp3:wo.kodeUp3,kodeUlp:wo.kodeUlp,ulp:wo.ulp,hari:wo.hari,tanggal:wo.tanggal,penyulang:wo.penyulang,section:wo.section,nomorGardu:wo.nomorGardu,statusWo:WoInsjar.statusDalam);
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        backgroundColor: page,
-        appBar: AppBar(
-          backgroundColor: ocean,
-          foregroundColor: Colors.white,
-          title: const Text('Inspeksi Gardu', style: TextStyle(fontWeight: FontWeight.w800)),
-        ),
-        body: Column(
-          children: [
-            _hero(),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                children: [
-                  _identityCard(),
-                  const SizedBox(height: 16),
-                  _measurementCard('02', 'Pengukuran WBP', true),
-                  const SizedBox(height: 16),
-                  _measurementCard('03', 'Pengukuran LWBP', false),
-                  const SizedBox(height: 16),
-                  _conditionCard(),
-                  const SizedBox(height: 16),
-                  _findingsCard(),
-                  const SizedBox(height: 16),
-                  _summaryCard(),
-                ],
-              ),
-            ),
-          ],
-        ),
-        bottomNavigationBar: readOnly
-            ? null
-            : SafeArea(
-                minimum: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _saving ? null : () { _finish = false; _save(); },
-                        style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-                        child: const Text('Simpan Progress'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _saving ? null : () { _finish = true; _save(); },
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(52),
-                          backgroundColor: gold,
-                          foregroundColor: navy,
-                        ),
-                        child: Text(_saving ? 'Menyimpan...' : 'Selesaikan WO', style: const TextStyle(fontWeight: FontWeight.w900)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-      );
+    backgroundColor:page,
+    appBar:AppBar(backgroundColor:blue,foregroundColor:Colors.white,title:const Text('Inspeksi Gardu',style:TextStyle(fontWeight:FontWeight.w900))),
+    body:ListView(padding:const EdgeInsets.fromLTRB(16,18,16,28),children:[_hero(),const SizedBox(height:20),_identity(),const SizedBox(height:18),_measurement('02','Pengukuran WBP',true),const SizedBox(height:18),_measurement('03','Pengukuran LWBP',false),const SizedBox(height:18),_conditions(),const SizedBox(height:18),_findings(),const SizedBox(height:18),_summary()]),
+    bottomNavigationBar:readOnly?null:SafeArea(minimum:const EdgeInsets.fromLTRB(16,10,16,14),child:SizedBox(height:54,child:ElevatedButton(onPressed:_saving?null:_savePressed,style:ElevatedButton.styleFrom(backgroundColor:gold,foregroundColor:navy,shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(15))),child:Text(_saving?'Menyimpan...':'Simpan',style:const TextStyle(fontWeight:FontWeight.w900))))),
+  );
 
-  Widget _hero() => Container(
-        width: double.infinity,
-        margin: const EdgeInsets.fromLTRB(16, 16, 16, 18),
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(color: ocean, borderRadius: BorderRadius.circular(18)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('NOMOR GARDU', style: TextStyle(color: Color(0xFFB8DCEF), fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
-            const SizedBox(height: 7),
-            Text(wo.nomorGardu.isEmpty ? '-' : wo.nomorGardu, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 5),
-            Text(wo.kodeWo, style: const TextStyle(color: Color(0xFFD5E8F3), fontSize: 12, fontWeight: FontWeight.w700)),
-          ],
-        ),
-      );
+  Widget _hero()=>Container(padding:const EdgeInsets.fromLTRB(22,24,22,26),decoration:BoxDecoration(gradient:const LinearGradient(colors:[blue,darkBlue]),borderRadius:BorderRadius.circular(25)),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(children:[const Expanded(child:Text('WORK ORDER INSPEKSI GARDU',style:TextStyle(color:Color(0xFFB9D9EA),fontSize:10,fontWeight:FontWeight.w900,letterSpacing:1.5))),_statusChip()]),const SizedBox(height:27),const Text('NOMOR GARDU',style:TextStyle(color:gold,fontSize:10,fontWeight:FontWeight.w900,letterSpacing:1.3)),const SizedBox(height:8),Text(wo.nomorGardu.isEmpty?'-':wo.nomorGardu,style:const TextStyle(color:Colors.white,fontSize:40,height:1,fontWeight:FontWeight.w900)),const SizedBox(height:20),Container(padding:const EdgeInsets.symmetric(horizontal:12,vertical:9),decoration:BoxDecoration(border:Border.all(color:const Color(0xFF70A8CC)),borderRadius:BorderRadius.circular(10)),child:Text(wo.kodeWo,style:const TextStyle(color:Colors.white,fontSize:11,fontWeight:FontWeight.w800))),const SizedBox(height:20),Text('${wo.ulp} • ${wo.penyulang} • ${wo.tanggal}',style:const TextStyle(color:Color(0xFFD7EAF5),fontSize:13))]));
+  Widget _statusChip()=>Container(padding:const EdgeInsets.symmetric(horizontal:12,vertical:8),decoration:BoxDecoration(color:paleGold,borderRadius:BorderRadius.circular(99)),child:Text(WoInsdu.normalisasiStatus(wo.statusWo),style:const TextStyle(color:Color(0xFF8A6200),fontSize:10,fontWeight:FontWeight.w900)));
 
-  Widget _identityCard() => _card(
-        '01',
-        'Identitas Gardu',
-        Column(
-          children: [
-            _readonlyField('Kode WO', wo.kodeWo),
-            const SizedBox(height: 12),
-            Row(children: [Expanded(child: _readonlyField('ULP', wo.ulp)), const SizedBox(width: 12), Expanded(child: _readonlyField('Tanggal', '${wo.hari}, ${wo.tanggal}'))]),
-            const SizedBox(height: 12),
-            Row(children: [Expanded(child: _readonlyField('Penyulang', wo.penyulang)), const SizedBox(width: 12), Expanded(child: _readonlyField('Section', wo.section))]),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(child: _integerField('jurusanTerpasang', 'Jurusan Terpasang')),
-                const SizedBox(width: 12),
-                Expanded(child: _integerField('jurusanTerpakai', 'Jurusan Terpakai')),
-              ],
-            ),
-          ],
-        ),
-      );
+  Widget _identity()=>_card('01','Identitas Gardu',Padding(padding:const EdgeInsets.all(18),child:Column(children:[Row(children:[Expanded(child:_readonly('PENYULANG',wo.penyulang)),const SizedBox(width:12),Expanded(child:_readonly('SECTION',wo.section))]),const SizedBox(height:15),Row(children:[Expanded(child:_integerField('jurusanTerpasang','JURUSAN TERPASANG')),const SizedBox(width:12),Expanded(child:_integerField('jurusanTerpakai','JURUSAN TERPAKAI'))])])));
 
-  Widget _measurementCard(String number, String title, bool wbp) {
-    final loading = wbp ? _gettingWbp : _gettingLwbp;
-    final fix = wbp ? _wbpFix : _lwbpFix;
-    final accuracy = wbp ? _wbpSearchAccuracy : _lwbpSearchAccuracy;
-    final distance = wbp ? _wbpDistance : _lwbpDistance;
-    return _card(
-      number,
-      title,
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _groupTitle('Beban Utama'),
-          _numericGrid(wbp ? wbpLoad : lwbpLoad, wbp),
-          const SizedBox(height: 18),
-          _groupTitle('Tegangan'),
-          _numericGrid(wbp ? wbpVoltage : lwbpVoltage, wbp),
-          const SizedBox(height: 18),
-          _coordinatePanel(fix: fix, loading: loading, accuracy: accuracy, distance: distance),
-        ],
-      ),
-    );
-  }
+  Widget _measurement(String number,String title,bool wbp){final fix=wbp?_wbpFix:_lwbpFix,loading=wbp?_gettingWbp:_gettingLwbp,accuracy=wbp?_wbpAccuracy:_lwbpAccuracy,distance=wbp?_wbpDistance:_lwbpDistance,time=wbp?_wbpTime:_lwbpTime;return _card(number,title,Padding(padding:const EdgeInsets.all(18),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[_locationHeader(wbp),const SizedBox(height:12),Container(width:double.infinity,padding:const EdgeInsets.all(14),decoration:BoxDecoration(border:Border.all(color:line),borderRadius:BorderRadius.circular(12)),child:Text(loading?(accuracy==null?'Mencari koordinat...':'Akurasi terbaik ${accuracy.toStringAsFixed(1)} m'):(fix?.coordinate??'Belum direkam'),style:const TextStyle(color:blue,fontSize:12,fontWeight:FontWeight.w900))),_timeRow(wbp?'Waktu Penginputan WBP':'Waktu Penginputan LWBP',time),Padding(padding:const EdgeInsets.symmetric(vertical:18),child:Row(crossAxisAlignment:CrossAxisAlignment.end,children:[const Expanded(child:Text('Jarak Gardu ke Petugas',style:TextStyle(color:muted,fontSize:12))),Text(distance==null?'—':'${distance.toStringAsFixed(1).replaceAll('.', ',')} m',style:const TextStyle(color:navy,fontSize:28,fontWeight:FontWeight.w900))])),const Divider(),_groupHeader('A','Beban Utama','ARUS'),_numericGrid(wbp?wbpLoad:lwbpLoad,wbp),const SizedBox(height:20),const Divider(),_groupHeader('V','Tegangan','VOLT'),_numericGrid(wbp?wbpVoltage:lwbpVoltage,wbp)]))));}
 
-  Widget _coordinatePanel({required LocationFix? fix, required bool loading, required double? accuracy, required double? distance}) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(13), border: Border.all(color: line)),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(color: const Color(0xFFE8F1FA), borderRadius: BorderRadius.circular(10)),
-              child: const Icon(Icons.gps_fixed_rounded, size: 17, color: ocean),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Koordinat Pengisian', style: TextStyle(color: navy, fontSize: 12, fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 5),
-                  Text(
-                    loading
-                        ? accuracy == null ? 'Mencari koordinat...' : 'Akurasi terbaik ${accuracy.toStringAsFixed(1)} m'
-                        : fix?.coordinate ?? 'Tersimpan otomatis saat kolom pengukuran dibuka',
-                    style: const TextStyle(color: muted, fontSize: 11.5),
-                  ),
-                  if (distance != null) ...[
-                    const SizedBox(height: 5),
-                    Text('Jarak ke Gardu ${distance.toStringAsFixed(1)} m', style: const TextStyle(color: ocean, fontSize: 12, fontWeight: FontWeight.w800)),
-                  ],
-                ],
-              ),
-            ),
-            if (fix != null) const Icon(Icons.lock_rounded, size: 16, color: muted),
-          ],
-        ),
-      );
+  Widget _locationHeader(bool wbp)=>Container(padding:const EdgeInsets.all(14),decoration:BoxDecoration(color:cyan,borderRadius:BorderRadius.circular(15),border:Border.all(color:const Color(0xFF7FC8D8))),child:Row(children:[Container(width:48,height:48,alignment:Alignment.center,decoration:BoxDecoration(color:Colors.white,borderRadius:BorderRadius.circular(14)),child:Stack(alignment:Alignment.center,children:[const Icon(Icons.gps_fixed_rounded,color:blue,size:32),Container(width:7,height:7,decoration:const BoxDecoration(color:gold,shape:BoxShape.circle))])),const SizedBox(width:12),Expanded(child:Text(wbp?'Lokasi Penginputan WBP':'Lokasi Penginputan LWBP',style:const TextStyle(color:navy,fontWeight:FontWeight.w900)))]));
+  Widget _timeRow(String label,String value)=>Padding(padding:const EdgeInsets.symmetric(vertical:15),child:Row(children:[Container(width:40,height:40,alignment:Alignment.center,decoration:BoxDecoration(color:const Color(0xFFD7F0FA),borderRadius:BorderRadius.circular(11)),child:const Icon(Icons.access_time_rounded,color:blue,size:20)),const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(label,style:const TextStyle(color:muted,fontSize:11)),const SizedBox(height:3),Text(value.isEmpty?'Belum direkam':value,style:const TextStyle(color:navy,fontSize:12,fontWeight:FontWeight.w900))]))]));
+  Widget _groupHeader(String unit,String title,String suffix)=>Padding(padding:const EdgeInsets.symmetric(vertical:14),child:Row(children:[Container(width:30,height:30,alignment:Alignment.center,decoration:BoxDecoration(color:const Color(0xFFBDEEF6),borderRadius:BorderRadius.circular(9)),child:Text(unit,style:const TextStyle(color:blue,fontWeight:FontWeight.w900))),const SizedBox(width:10),Text(title,style:const TextStyle(color:navy,fontSize:15,fontWeight:FontWeight.w900)),const Spacer(),Text(suffix,style:const TextStyle(color:blue,fontSize:10,fontWeight:FontWeight.w900))]));
+  Widget _numericGrid(Map<String,String> entries,bool wbp)=>LayoutBuilder(builder:(context,constraints){final width=(constraints.maxWidth-12)/2;return Wrap(spacing:12,runSpacing:14,children:entries.entries.map((entry)=>SizedBox(width:width,child:TextField(controller:_fields[entry.key],enabled:!readOnly,keyboardType:const TextInputType.numberWithOptions(decimal:true),onTap:()=>_capture(wbp),onChanged:(_)=>setState((){}),decoration:_decoration(entry.value).copyWith(errorText:_decimalError(entry.key)))).toList());});
 
-  Widget _conditionCard() => _card(
-        '04',
-        'Kondisi Cover & Jumperan',
-        Column(
-          children: conditionLabels.entries.map((entry) {
-            final options = entry.key.startsWith('jumperan') ? jumperOptions : coverOptions;
-            final current = _text(entry.key);
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: DropdownButtonFormField<String>(
-                key: ValueKey('condition-${entry.key}-$current'),
-                isExpanded: true,
-                initialValue: options.contains(current) ? current : null,
-                hint: const Text('Pilih kondisi'),
-                items: options.map((value) => DropdownMenuItem(value: value, child: Text(value))).toList(),
-                onChanged: readOnly ? null : (value) => setState(() => _fields[entry.key]!.text = value ?? ''),
-                decoration: _decoration(entry.value),
-              ),
-            );
-          }).toList(),
-        ),
-      );
+  Widget _conditions()=>_card('04','Kondisi Cover & Jumperan',Padding(padding:const EdgeInsets.all(18),child:Column(children:conditionLabels.entries.map((entry){final options=entry.key.startsWith('jumperan')?jumperOptions:coverOptions,current=_text(entry.key);return Padding(padding:const EdgeInsets.only(bottom:14),child:DropdownButtonFormField<String>(key:ValueKey('condition-${entry.key}-$current'),isExpanded:true,initialValue:options.contains(current)?current:null,hint:const Text('Pilih kondisi'),items:options.map((value)=>DropdownMenuItem(value:value,child:Text(value))).toList(),onChanged:readOnly?null:(value)=>setState(()=>_fields[entry.key]!.text=value??''),decoration:_decoration(entry.value.toUpperCase())));}).toList())));
+  Widget _findings()=>_card('05','Temuan Inspeksi',SizedBox(height:390,child:TemuanTab(key:ValueKey('temuan-${wo.kodeWo}'),wo:_findingWo,sesi:widget.sesi,canAddTemuan:!readOnly)));
+  Widget _summary()=>_card('06','Ringkasan Pekerjaan',Padding(padding:const EdgeInsets.fromLTRB(18,8,18,18),child:Column(children:[_summaryRow(Icons.access_time_rounded,'Waktu Mulai',wo.waktuMulai),_summaryRow(Icons.access_time_rounded,'Waktu Selesai',wo.waktuSelesai),_summaryRow(Icons.timelapse_rounded,'Durasi',wo.durasiPekerjaan),_summaryRow(Icons.chat_bubble_outline_rounded,'Jumlah Temuan','$_findingCount temuan',last:true)])));
+  Widget _summaryRow(IconData icon,String label,String value,{bool last=false})=>Container(minHeight:66,decoration:BoxDecoration(border:last?null:const Border(bottom:BorderSide(color:line))),child:Row(children:[Container(width:40,height:40,alignment:Alignment.center,decoration:BoxDecoration(color:const Color(0xFFD7F0FA),borderRadius:BorderRadius.circular(11)),child:Icon(icon,color:blue,size:20)),const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(label,style:const TextStyle(color:muted,fontSize:11)),const SizedBox(height:3),Text(value.trim().isEmpty?'-':value,style:const TextStyle(color:navy,fontSize:12,fontWeight:FontWeight.w900))]))]));
 
-  Widget _findingsCard() => _card(
-        '05',
-        'Temuan Inspeksi',
-        SizedBox(
-          height: 390,
-          child: TemuanTab(
-            key: ValueKey('temuan-${wo.kodeWo}'),
-            wo: _findingWo,
-            sesi: widget.sesi,
-            canAddTemuan: !readOnly,
-          ),
-        ),
-        padding: EdgeInsets.zero,
-      );
-
-  Widget _summaryCard() => _card(
-        '06',
-        'Ringkasan Pekerjaan',
-        Column(
-          children: [
-            _summaryRow('Status WO', WoInsdu.normalisasiStatus(wo.statusWo)),
-            const Divider(height: 22),
-            _summaryRow('Waktu mulai', wo.waktuMulai),
-            const Divider(height: 22),
-            _summaryRow('Waktu selesai', wo.waktuSelesai),
-            const Divider(height: 22),
-            _summaryRow('Durasi pekerjaan', wo.durasiPekerjaan),
-            const Divider(height: 22),
-            _summaryRow('Koordinat WBP', _wbpFix?.coordinate ?? '-'),
-            const Divider(height: 22),
-            _summaryRow('Jarak WBP', _wbpDistance == null ? '-' : '${_wbpDistance!.toStringAsFixed(1)} m'),
-            const Divider(height: 22),
-            _summaryRow('Koordinat LWBP', _lwbpFix?.coordinate ?? '-'),
-            const Divider(height: 22),
-            _summaryRow('Jarak LWBP', _lwbpDistance == null ? '-' : '${_lwbpDistance!.toStringAsFixed(1)} m'),
-          ],
-        ),
-      );
-
-  Widget _card(String number, String title, Widget child, {EdgeInsets padding = const EdgeInsets.all(16)}) => Container(
-        padding: padding,
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: line)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: padding == EdgeInsets.zero ? const EdgeInsets.all(16) : EdgeInsets.zero,
-              child: Row(
-                children: [
-                  Text(number, style: const TextStyle(color: ocean, fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 1)),
-                  const SizedBox(width: 10),
-                  Text(title, style: const TextStyle(color: navy, fontSize: 16, fontWeight: FontWeight.w900)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 15),
-            child,
-          ],
-        ),
-      );
-
-  Widget _readonlyField(String label, String value) => InputDecorator(
-        decoration: _decoration(label),
-        child: Text(value.trim().isEmpty ? '-' : value, style: const TextStyle(color: navy, fontWeight: FontWeight.w700)),
-      );
-
-  Widget _integerField(String key, String label) => TextField(
-        controller: _fields[key],
-        enabled: !readOnly,
-        keyboardType: TextInputType.number,
-        decoration: _decoration(label),
-      );
-
-  Widget _numericGrid(Map<String, String> entries, bool wbp) => LayoutBuilder(
-        builder: (context, constraints) {
-          final width = (constraints.maxWidth - 10) / 2;
-          return Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: entries.entries.map((entry) => SizedBox(
-              width: width,
-              child: TextField(
-                controller: _fields[entry.key],
-                enabled: !readOnly,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                onTap: () => _captureIfNeeded(wbp),
-                onChanged: (_) => setState(() {}),
-                decoration: _decoration(entry.value).copyWith(errorText: _decimalError(entry.key)),
-              ),
-            )).toList(),
-          );
-        },
-      );
-
-  Widget _groupTitle(String title) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Text(title, style: const TextStyle(color: ocean, fontSize: 13, fontWeight: FontWeight.w900)),
-      );
-
-  InputDecoration _decoration(String label) => InputDecoration(
-        labelText: label,
-        floatingLabelBehavior: FloatingLabelBehavior.auto,
-        filled: true,
-        fillColor: Colors.white,
-        isDense: true,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: line)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: line)),
-        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.red, width: 1.5)),
-        focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.red, width: 2)),
-      );
-
-  Widget _summaryRow(String label, String value) => Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(width: 120, child: Text(label, style: const TextStyle(color: muted, fontSize: 12))),
-          const SizedBox(width: 8),
-          Expanded(child: Text(value.trim().isEmpty ? '-' : value, textAlign: TextAlign.right, style: const TextStyle(color: navy, fontSize: 12.5, fontWeight: FontWeight.w900))),
-        ],
-      );
+  Widget _card(String number,String title,Widget child)=>Container(decoration:BoxDecoration(color:Colors.white,borderRadius:BorderRadius.circular(22),border:Border.all(color:line)),clipBehavior:Clip.antiAlias,child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Padding(padding:const EdgeInsets.all(18),child:Row(children:[Container(width:36,height:36,alignment:Alignment.center,decoration:BoxDecoration(color:paleGold,shape:BoxShape.circle,border:Border.all(color:gold)),child:Text(number,style:const TextStyle(color:Color(0xFF7A5700),fontSize:11,fontWeight:FontWeight.w900))),const SizedBox(width:12),Text(title,style:const TextStyle(color:navy,fontSize:17,fontWeight:FontWeight.w900))])),const Divider(height:1),child]));
+  Widget _readonly(String label,String value)=>InputDecorator(decoration:_decoration(label),child:Text(value.isEmpty?'-':value,style:const TextStyle(fontWeight:FontWeight.w900)));
+  Widget _integerField(String key,String label)=>TextField(controller:_fields[key],enabled:!readOnly,keyboardType:TextInputType.number,decoration:_decoration(label));
+  InputDecoration _decoration(String label)=>InputDecoration(labelText:label,floatingLabelBehavior:FloatingLabelBehavior.always,isDense:true,border:OutlineInputBorder(borderRadius:BorderRadius.circular(13),borderSide:const BorderSide(color:line)),enabledBorder:OutlineInputBorder(borderRadius:BorderRadius.circular(13),borderSide:const BorderSide(color:line)),errorBorder:OutlineInputBorder(borderRadius:BorderRadius.circular(13),borderSide:const BorderSide(color:Colors.red,width:1.5)),focusedErrorBorder:OutlineInputBorder(borderRadius:BorderRadius.circular(13),borderSide:const BorderSide(color:Colors.red,width:2)));
 }
