@@ -8,6 +8,7 @@ Future<void> showOperationResultDialog(
   required String title,
   required String message,
 }) {
+  final showMessage = title != 'WO Tersimpan' && message.trim().isNotEmpty;
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: false,
@@ -97,16 +98,18 @@ Future<void> showOperationResultDialog(
                           letterSpacing: -.2,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        message,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: KopitiamColors.muted,
-                          fontSize: 13,
-                          height: 1.5,
+                      if (showMessage) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          message,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: KopitiamColors.muted,
+                            fontSize: 13,
+                            height: 1.5,
+                          ),
                         ),
-                      ),
+                      ],
                       const SizedBox(height: 18),
                       Container(
                         padding: const EdgeInsets.symmetric(
