@@ -57,10 +57,20 @@ void main() {
       expect(source, contains('TemuanFormScreen.c4a'));
     });
 
-    test('database version 9 migrates queue metadata and index', () {
+    test('database version 10 keeps queue migration and adds Gardu fields', () {
       final source = File('lib/services/sqlite_service.dart').readAsStringSync();
-      expect(source, contains('_databaseVersion = 9'));
+      expect(source, contains('_databaseVersion = 10'));
       for (final column in ['sync_status', 'sync_error', 'retry_count', 'last_attempt_at']) {
+        expect(source, contains(column));
+      }
+      for (final column in [
+        'jurusan_terpasang',
+        'jurusan_terpakai',
+        'koordinat_penginputan_wbp',
+        'jarak_gardu_petugas_wbp',
+        'koordinat_penginputan_lwbp',
+        'jarak_gardu_petugas_lwbp',
+      ]) {
         expect(source, contains(column));
       }
       expect(source, contains('idx_temuan_c4a_queue'));
