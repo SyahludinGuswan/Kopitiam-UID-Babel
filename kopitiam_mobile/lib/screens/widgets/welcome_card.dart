@@ -85,21 +85,56 @@ class _WelcomeCardState extends State<WelcomeCard>
       if (_isInsdu) {
         final items = await WoInsduRepository().semua();
         values[0] = items.length;
-        values[1] = items.where((i) => WoInsdu.normalisasiStatus(i.statusWo) == WoInsdu.statusMulai).length;
-        values[2] = items.where((i) => WoInsdu.normalisasiStatus(i.statusWo) == WoInsdu.statusDalam).length;
-        values[3] = items.where((i) => WoInsdu.normalisasiStatus(i.statusWo) == WoInsdu.statusSelesai).length;
+        values[1] = items
+            .where((item) =>
+                WoInsdu.normalisasiStatus(item.statusWo) ==
+                WoInsdu.statusMulai)
+            .length;
+        values[2] = items
+            .where((item) =>
+                WoInsdu.normalisasiStatus(item.statusWo) ==
+                WoInsdu.statusDalam)
+            .length;
+        values[3] = items
+            .where((item) =>
+                WoInsdu.normalisasiStatus(item.statusWo) ==
+                WoInsdu.statusSelesai)
+            .length;
       } else if (_isRow) {
         final items = await WoRowRepository().semua();
         values[0] = items.length;
-        values[1] = items.where((i) => WoRow.normalisasiStatus(i.statusWo) == WoRow.statusPenugasan).length;
-        values[2] = items.where((i) => WoRow.normalisasiStatus(i.statusWo) == WoRow.statusProgress).length;
-        values[3] = items.where((i) => WoRow.normalisasiStatus(i.statusWo) == WoRow.statusSelesai).length;
+        values[1] = items
+            .where((item) =>
+                WoRow.normalisasiStatus(item.statusWo) ==
+                WoRow.statusPenugasan)
+            .length;
+        values[2] = items
+            .where((item) =>
+                WoRow.normalisasiStatus(item.statusWo) ==
+                WoRow.statusProgress)
+            .length;
+        values[3] = items
+            .where((item) =>
+                WoRow.normalisasiStatus(item.statusWo) == WoRow.statusSelesai)
+            .length;
       } else {
         final items = await WoInsjarRepository().semua();
         values[0] = items.length;
-        values[1] = items.where((i) => WoInsjar.normalisasiStatus(i.statusWo) == WoInsjar.statusMulai).length;
-        values[2] = items.where((i) => WoInsjar.normalisasiStatus(i.statusWo) == WoInsjar.statusDalam).length;
-        values[3] = items.where((i) => WoInsjar.normalisasiStatus(i.statusWo) == WoInsjar.statusSelesai).length;
+        values[1] = items
+            .where((item) =>
+                WoInsjar.normalisasiStatus(item.statusWo) ==
+                WoInsjar.statusMulai)
+            .length;
+        values[2] = items
+            .where((item) =>
+                WoInsjar.normalisasiStatus(item.statusWo) ==
+                WoInsjar.statusDalam)
+            .length;
+        values[3] = items
+            .where((item) =>
+                WoInsjar.normalisasiStatus(item.statusWo) ==
+                WoInsjar.statusSelesai)
+            .length;
       }
       if (mounted) {
         setState(() {
@@ -116,16 +151,39 @@ class _WelcomeCardState extends State<WelcomeCard>
 
   String get _dateText {
     final now = DateTime.now();
-    const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
-    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-    return '${days[now.weekday - 1]}, ${now.day} ${months[now.month - 1]} ${now.year}';
+    const days = [
+      'Senin',
+      'Selasa',
+      'Rabu',
+      'Kamis',
+      'Jumat',
+      'Sabtu',
+      'Minggu',
+    ];
+    const months = [
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
+    ];
+    return '${days[now.weekday - 1]}, ${now.day} '
+        '${months[now.month - 1]} ${now.year}';
   }
 
   @override
   Widget build(BuildContext context) {
     final team = '${widget.sesi['subTim'] ?? widget.sesi['tim'] ?? '-'}';
     final ulp = '${widget.sesi['ulp'] ?? '-'}';
-    final bidang = '${widget.sesi['bidang'] ?? widget.sesi['Bidang'] ?? '-'}';
+    final bidang =
+        '${widget.sesi['bidang'] ?? widget.sesi['Bidang'] ?? '-'}';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -135,66 +193,194 @@ class _WelcomeCardState extends State<WelcomeCard>
           if (_loading && _total == 0)
             const LinearProgressIndicator()
           else if (_isRow)
-            WoSummaryCard.row(total: _total, penugasan: _waiting, progress: _progress, selesai: _done)
+            WoSummaryCard.row(
+              total: _total,
+              penugasan: _waiting,
+              progress: _progress,
+              selesai: _done,
+            )
           else
-            WoSummaryCard.insjar(total: _total, menunggu: _waiting, sedang: _progress, selesai: _done),
+            WoSummaryCard.insjar(
+              total: _total,
+              menunggu: _waiting,
+              sedang: _progress,
+              selesai: _done,
+            ),
         ],
       ],
     );
   }
 
   Widget _welcome(String team, String ulp, String bidang) {
-    final online = _online == true ? 'ONLINE' : _online == false ? 'OFFLINE' : 'CEK...';
-    final dot = _online == true ? KopitiamColors.success : _online == false ? KopitiamColors.danger : KopitiamColors.muted;
+    final online = _online == true
+        ? 'ONLINE'
+        : _online == false
+            ? 'OFFLINE'
+            : 'CEK...';
+    final dot = _online == true
+        ? KopitiamColors.success
+        : _online == false
+            ? KopitiamColors.danger
+            : KopitiamColors.muted;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(22, 20, 18, 20),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [Color(0xFF176DA8), Color(0xFF004D8C), Color(0xFF004279)]),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF176DA8), Color(0xFF004D8C), Color(0xFF004279)],
+        ),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFF2A79B2)),
-        boxShadow: const [BoxShadow(color: Color(0x33071F33), blurRadius: 30, offset: Offset(0, 16))],
+        border: Border.all(color: const Color(0xFFD6A93A)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33071F33),
+            blurRadius: 30,
+            offset: Offset(0, 16),
+          ),
+        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(_dateText, style: const TextStyle(color: KopitiamColors.yellow, fontSize: 11, fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 8),
-                    const Text('Semangat Pagi,', style: TextStyle(color: KopitiamColors.surface, fontSize: 12, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    Text(team, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: KopitiamColors.surface, fontSize: 25, fontWeight: FontWeight.w900)),
+          const Positioned.fill(
+            child: IgnorePointer(child: CustomPaint(painter: _GoldOrbitPainter())),
+          ),
+          const Positioned(
+            left: 56,
+            right: 56,
+            top: 0,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    KopitiamColors.gold,
+                    KopitiamColors.yellow,
+                    KopitiamColors.gold,
+                    Colors.transparent,
                   ],
                 ),
+                boxShadow: [
+                  BoxShadow(color: Color(0x55D6A93A), blurRadius: 10),
+                ],
               ),
-              InkWell(
-                onTap: _checking ? null : _checkNetwork,
-                borderRadius: BorderRadius.circular(100),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
-                  decoration: BoxDecoration(color: KopitiamColors.navy, borderRadius: BorderRadius.circular(100), border: Border.all(color: KopitiamColors.surface)),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [Container(width: 9, height: 9, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)), const SizedBox(width: 7), Text(online, style: const TextStyle(color: KopitiamColors.surface, fontSize: 10, fontWeight: FontWeight.w900))]),
-                ),
-              ),
-            ],
+              child: SizedBox(height: 3),
+            ),
           ),
-          const SizedBox(height: 18),
-          const Divider(color: Color(0xA6FBFDFE), height: 1),
-          const SizedBox(height: 16),
-          Stack(
-            alignment: Alignment.bottomRight,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(right: 52),
-                child: Row(children: [Expanded(child: _info('UNIT KERJA', ulp)), const SizedBox(width: 18), Expanded(child: _info('BIDANG', bidang))]),
-              ),
-              const WelcomeCoffeeMark(),
-            ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(22, 20, 18, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _dateText,
+                            style: const TextStyle(
+                              color: KopitiamColors.yellow,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Semangat Pagi,',
+                            style: TextStyle(
+                              color: KopitiamColors.surface,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            team,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: KopitiamColors.surface,
+                              fontSize: 25,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    InkWell(
+                      onTap: _checking ? null : _checkNetwork,
+                      borderRadius: BorderRadius.circular(100),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: KopitiamColors.navy,
+                          borderRadius: BorderRadius.circular(100),
+                          border: Border.all(color: KopitiamColors.gold),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 9,
+                              height: 9,
+                              decoration: BoxDecoration(
+                                color: dot,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 7),
+                            Text(
+                              online,
+                              style: const TextStyle(
+                                color: KopitiamColors.surface,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  height: 1,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        KopitiamColors.gold,
+                        Color(0xA6FBFDFE),
+                        Color(0xA6FBFDFE),
+                        KopitiamColors.gold,
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 52),
+                      child: Row(
+                        children: [
+                          Expanded(child: _info('UNIT KERJA', ulp)),
+                          const SizedBox(width: 18),
+                          Expanded(child: _info('BIDANG', bidang)),
+                        ],
+                      ),
+                    ),
+                    const WelcomeCoffeeMark(),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -204,9 +390,44 @@ class _WelcomeCardState extends State<WelcomeCard>
   Widget _info(String label, String value) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: KopitiamColors.yellow, fontSize: 9, fontWeight: FontWeight.w900)),
+          Text(
+            label,
+            style: const TextStyle(
+              color: KopitiamColors.yellow,
+              fontSize: 9,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(value.isEmpty ? '-' : value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: KopitiamColors.surface, fontSize: 13, fontWeight: FontWeight.w800)),
+          Text(
+            value.isEmpty ? '-' : value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: KopitiamColors.surface,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ],
       );
+}
+
+class _GoldOrbitPainter extends CustomPainter {
+  const _GoldOrbitPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0x47D6A93A)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    final center = Offset(size.width + 8, -18);
+    canvas.drawCircle(center, 110, paint);
+    paint.color = const Color(0x28FFD84D);
+    canvas.drawCircle(center, 76, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _GoldOrbitPainter oldDelegate) => false;
 }
