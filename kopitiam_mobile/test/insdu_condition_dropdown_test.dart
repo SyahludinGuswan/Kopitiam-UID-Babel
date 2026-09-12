@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kopitiam_mobile/models/wo_insdu.dart';
 import 'package:kopitiam_mobile/screens/wo_insdu_form_screen.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 Finder field(String label) => find.byWidgetPredicate(
   (widget) =>
@@ -22,6 +23,11 @@ List<String?> options(WidgetTester tester, String label) {
 }
 
 void main() {
+  setUpAll(() {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  });
+
   testWidgets('form Gardu memakai enam bagian dan dropdown kondisi tetap lengkap', (
     tester,
   ) async {
