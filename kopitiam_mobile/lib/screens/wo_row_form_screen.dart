@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/temuan_inspeksi.dart';
@@ -27,8 +26,10 @@ class WoRowFormScreen extends StatefulWidget {
 
 class _WoRowFormScreenState extends State<WoRowFormScreen> {
   static const blue = Color(0xFF0A3E74);
+  static const blueMid = Color(0xFF075B96);
   static const navy = Color(0xFF071B30);
   static const amber = Color(0xFFFFAE00);
+  static const paleGold = Color(0xFFFFF4C7);
   static const muted = Color(0xFF64748B);
   static const line = Color(0xFFE2E8F0);
   static const green = Color(0xFF16A34A);
@@ -58,13 +59,6 @@ class _WoRowFormScreenState extends State<WoRowFormScreen> {
     return (_tindakLanjut ?? '').trim();
   }
 
-  String get _lokasiSesudah {
-    final nama = p.basename(_fotoSesudah);
-    if (nama.isEmpty) return '-';
-    if (_row.folderPath.isEmpty) return nama;
-    return '${_row.folderPath.replaceAll(RegExp(r'/+\$'), '')}/$nama';
-  }
-
   @override
   void initState() {
     super.initState();
@@ -85,12 +79,11 @@ class _WoRowFormScreenState extends State<WoRowFormScreen> {
   Future<void> _mulai() async {
     if (_readOnly || _saving) return;
     await _repo.mulaiPekerjaan(_row.kodeWo);
-    if (mounted) {
-      setState(() {
-        _status = WoRow.statusProgress;
-        _waktuMulai ??= DateTime.now();
-      });
-    }
+    if (!mounted) return;
+    setState(() {
+      _status = WoRow.statusProgress;
+      _waktuMulai ??= DateTime.now();
+    });
   }
 
   void _lihatFoto() {
@@ -100,57 +93,46 @@ class _WoRowFormScreenState extends State<WoRowFormScreen> {
       builder: (_) => GestureDetector(
         onTap: () => Navigator.of(context).pop(),
         child: Dialog.fullscreen(
-          backgroundColor: Colors.black.withValues(alpha: 0.9),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              InteractiveViewer(
-                minScale: 0.5,
-                maxScale: 4,
-                child: Center(
-                  child: Image.file(File(_fotoSesudah), fit: BoxFit.contain),
-                ),
+          backgroundColor: Colors.black.withValues(alpha: .9),
+          child: Stack(fit: StackFit.expand, children: [
+            InteractiveViewer(
+              minScale: .5,
+              maxScale: 4,
+              child: Center(
+                child: Image.file(File(_fotoSesudah), fit: BoxFit.contain),
               ),
-              const Positioned(
-                top: 48,
-                right: 16,
-                child: Icon(Icons.close, color: Colors.white, size: 28),
-              ),
-            ],
-          ),
+            ),
+            const Positioned(
+              top: 48,
+              right: 16,
+              child: Icon(Icons.close, color: Colors.white, size: 28),
+            ),
+          ]),
         ),
       ),
     );
   }
 
-  /// Menangani ketukan pada kolom kamera untuk verifikasi foto.
-  /// - Jika foto belum ada: langsung membuka kamera.
-  /// - Jika foto sudah ada: menampilkan 2 pilihan (Lihat Hasil / Ambil Ulang)
-  ///   agar petugas dapat memverifikasi apakah foto sudah sesuai.
   void _onFotoTap() {
-    final hasFoto = _fotoSesudah.isNotEmpty &&
-        File(_fotoSesudah).existsSync();
-    if (!hasFoto) {
+    final hasPhoto =
+        _fotoSesudah.isNotEmpty && File(_fotoSesudah).existsSync();
+    if (!hasPhoto) {
       if (_editable && !_takingPhoto) _ambilFoto();
       return;
     }
-    if (!_editable) {
-      _lihatFoto();
-      return;
-    }
+    if (!_editable) return _lihatFoto();
     showDialog<void>(
       context: context,
-      builder: (dialogCtx) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Foto Sesudah'),
         content: const Text(
           'Foto telah tersimpan. Verifikasi apakah foto sudah sesuai.',
           textAlign: TextAlign.center,
         ),
-        actionsAlignment: MainAxisAlignment.spaceBetween,
         actions: [
           TextButton.icon(
             onPressed: () {
-              Navigator.of(dialogCtx).pop();
+              Navigator.pop(dialogContext);
               _lihatFoto();
             },
             icon: const Icon(Icons.visibility_rounded),
@@ -158,13 +140,9 @@ class _WoRowFormScreenState extends State<WoRowFormScreen> {
           ),
           FilledButton.icon(
             onPressed: () {
-              Navigator.of(dialogCtx).pop();
+              Navigator.pop(dialogContext);
               _ambilFoto();
             },
-            style: FilledButton.styleFrom(
-              backgroundColor: amber,
-              foregroundColor: navy,
-            ),
             icon: const Icon(Icons.camera_alt_rounded),
             label: const Text('Ambil Ulang Foto'),
           ),
@@ -219,21 +197,18 @@ class _WoRowFormScreenState extends State<WoRowFormScreen> {
   Future<void> _simpanRealisasi() async {
     if (_saving) return;
     if (_tindakLanjut == null || _tindakLanjut!.isEmpty) {
-      _message('Pilih Tindak Lanjut terlebih dahulu.');
-      return;
+      return _message('Pilih Tindak Lanjut terlebih dahulu.');
     }
     if (_isTebang && _diameterValue == null) {
-      _message('Isi Ukuran Diameter Batang (cm) bernilai angka.');
-      return;
+      return _message('Isi Ukuran Diameter Batang (cm) bernilai angka.');
     }
     if (_fotoSesudah.isEmpty) {
-      _message('Foto Sesudah wajib diambil.');
-      return;
+      return _message('Foto Sesudah wajib diambil.');
     }
     setState(() => _saving = true);
     try {
       final now = DateTime.now();
-      final updated = _row.copyWith(
+      await _repo.simpan(_row.copyWith(
         tindakLanjut: _tindakLanjut,
         ukuranDiameterBatang: _isTebang ? _diameterValue : null,
         jenisTebangan: _jenisPekerjaan,
@@ -247,8 +222,7 @@ class _WoRowFormScreenState extends State<WoRowFormScreen> {
                 : WoInsjar.stampLengkap(now),
         waktuRealisasi: WoInsjar.stampLengkap(now),
         isDirty: true,
-      );
-      await _repo.simpan(updated);
+      ));
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
       if (mounted) {
@@ -263,16 +237,17 @@ class _WoRowFormScreenState extends State<WoRowFormScreen> {
   }
 
   void _bukaMaps() {
-    final clean = _row.koordinat.trim();
-    if (clean.isEmpty) {
-      _message('Koordinat temuan belum tersedia.');
-      return;
+    final coordinate = _row.koordinat.trim();
+    if (coordinate.isEmpty) {
+      return _message('Koordinat temuan belum tersedia.');
     }
-    final uri = Uri.parse(
-      'https://www.google.com/maps/dir/?api=1&destination='
-      '${Uri.encodeComponent(clean)}',
+    launchUrl(
+      Uri.parse(
+        'https://www.google.com/maps/dir/?api=1&destination='
+        '${Uri.encodeComponent(coordinate)}',
+      ),
+      mode: LaunchMode.externalApplication,
     );
-    launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   void _message(String text, {bool error = false}) {
@@ -285,548 +260,383 @@ class _WoRowFormScreenState extends State<WoRowFormScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final row = _row;
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FB),
-      appBar: AppBar(
-        title: const Text(
-          'Tindak Lanjut ROW',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: const Color(0xFFF4F7FB),
+        appBar: AppBar(
+          title: const Text(
+            'Tindak Lanjut ROW',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+          ),
+          backgroundColor: navy,
+          foregroundColor: Colors.white,
         ),
-        backgroundColor: blue,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        titleSpacing: 16,
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _header(row),
-                const SizedBox(height: 14),
-                _temuanCard(row),
-                const SizedBox(height: 14),
-                _realisasiCard(),
-                const SizedBox(height: 14),
-                _fotoCard(),
-              ],
-            ),
-          ),
-          Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Color(0x1A0F172A),
-                  blurRadius: 10,
-                  offset: Offset(0, -2),
-                ),
-              ],
-            ),
-            padding: EdgeInsets.fromLTRB(
-              16,
-              12,
-              16,
-              12 + MediaQuery.paddingOf(context).bottom,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: FilledButton(
-                    onPressed: _readOnly || _saving ? null : _simpanRealisasi,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: _readOnly ? navy : amber,
-                      foregroundColor: navy,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: _saving
-                        ? const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: navy,
-                                ),
-                              ),
-                              SizedBox(width: 10),
-                              Text(
-                                'Menyimpan...',
-                                style: TextStyle(fontWeight: FontWeight.w800),
-                              ),
-                            ],
-                          )
-                        : Text(
-                            _readOnly ? 'ROW Selesai' : 'Simpan Realisasi',
-                            style: const TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _header(WoRow row) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF004D8C), Color(0xFF071B30)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x26004D8C),
-              blurRadius: 14,
-              offset: Offset(0, 6),
-            ),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 110),
+          children: [
+            _hero(),
+            const SizedBox(height: 18),
+            _section('01', 'WO', _woBody()),
+            const SizedBox(height: 18),
+            _section('02', 'Pekerjaan', _workBody()),
+            const SizedBox(height: 18),
+            _section('03', 'Eviden Sesudah', _evidenceBody()),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.assignment_turned_in_rounded,
-                    color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'Kode Temuan',
-                    style: TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                ),
-                _statusChip(_status),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              row.kodeWo,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
+        bottomNavigationBar: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: FilledButton(
+              onPressed: _readOnly || _saving ? null : _simpanRealisasi,
+              style: FilledButton.styleFrom(
+                backgroundColor: navy,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(
+                _saving
+                    ? 'Menyimpan...'
+                    : _readOnly
+                        ? 'ROW Selesai'
+                        : 'Simpan Realisasi',
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              row.kodeTemuan,
-              style: const TextStyle(color: Colors.white70, fontSize: 13),
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                const Icon(Icons.location_city_rounded,
-                    size: 15, color: Colors.white70),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    '${row.ulp} \u2022 ${row.kodeUlp}',
-                    style:
-                        const TextStyle(color: Colors.white70, fontSize: 13),
-                  ),
-                ),
-                if (!_readOnly && _status == WoRow.statusPenugasan)
-                  TextButton.icon(
-                    onPressed: _saving ? null : _mulai,
-                    style: TextButton.styleFrom(
-                      backgroundColor: amber,
-                      foregroundColor: navy,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                    ),
-                    icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                    label: const Text(
-                      'Mulai Pekerjaan',
-                      style: TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                  ),
-              ],
-            ),
-          ],
+          ),
         ),
       );
 
-  Widget _statusChip(String value) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+  Widget _hero() => Container(
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: _readOnly ? green : Colors.white.withValues(alpha: .14),
+          gradient: const LinearGradient(
+            colors: [blueMid, blue, navy],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x26004D8C),
+              blurRadius: 22,
+              offset: Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Icon(
+              Icons.assignment_turned_in_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                'WORK ORDER ROW',
+                style: TextStyle(
+                  color: Color(0xFFD7EAF5),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.1,
+                ),
+              ),
+            ),
+            _statusChip(),
+          ]),
+          const SizedBox(height: 14),
+          Text(
+            _row.kodeWo,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            _row.kodeTemuan,
+            style: const TextStyle(color: Color(0xFFD7EAF5), fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          const Divider(color: Color(0x44FFFFFF), height: 1),
+          const SizedBox(height: 11),
+          Text(
+            '${_row.ulp} • ${_row.kodeUlp}',
+            style: const TextStyle(color: Color(0xFFD7EAF5), fontSize: 12),
+          ),
+          if (!_readOnly && _status == WoRow.statusPenugasan) ...[
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _saving ? null : _mulai,
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: const Text('Mulai Pekerjaan'),
+              ),
+            ),
+          ],
+        ]),
+      );
+
+  Widget _statusChip() => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: .14),
           borderRadius: BorderRadius.circular(100),
         ),
         child: Text(
-          value,
+          _status,
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 11,
+            fontSize: 10,
             fontWeight: FontWeight.w800,
           ),
         ),
       );
 
-  Widget _temuanCard(WoRow row) => _card(
-        'Info Temuan',
-        [
-          _readRow('Temuan', row.temuan),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  children: [_readRow('Jenis Object', row.jenisObject)],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  children: [_readRow('Tier', row.tier)],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          _readRow('Prioritas', row.prioritas),
-          const SizedBox(height: 10),
-          _readRow('Segmen', row.segmen),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                  child:
-                      Column(children: [_readRow('Section', row.section)])),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                    children: [_readRow('Penyulang', row.penyulang)]),
-              ),
-            ],
-          ),
-          if (row.jenisPohon.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            _readRow('Jenis Pohon', row.jenisPohon),
-          ],
-          const SizedBox(height: 10),
-          InkWell(
-            onTap: _bukaMaps,
-            borderRadius: BorderRadius.circular(10),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8F1FA),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.map_rounded, size: 18, color: blue),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      row.koordinat.isEmpty
-                          ? 'Koordinat belum tersedia'
-                          : row.koordinat,
-                      style: const TextStyle(
-                        color: blue,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                  const Icon(Icons.arrow_forward_rounded,
-                      size: 18, color: blue),
-                ],
-              ),
-            ),
-          ),
-        ],
-      );
-
-  Widget _realisasiCard() => _card(
-        'Tindak Lanjut & Realisasi',
-        [
-          DropdownButtonFormField<String>(
-            value: WoRow.tindakLanjutOptions.contains(_tindakLanjut)
-                ? _tindakLanjut
-                : null,
-            hint: const Text('--Pilih Tindak Lanjut--'),
-            items: WoRow.tindakLanjutOptions
-                .map(
-                  (value) => DropdownMenuItem(
-                    value: value,
-                    child: Text(value),
-                  ),
-                )
-                .toList(),
-            onChanged: _editable
-                ? (value) => setState(() => _tindakLanjut = value)
-                : null,
-            decoration: _inputDecoration('Tindak Lanjut *'),
-          ),
-          if (_isTebang) ...[
-            const SizedBox(height: 12),
-            TextField(
-              controller: _diameterCtrl,
-              enabled: _editable,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              onChanged: (_) => setState(() {}),
-              decoration: _inputDecoration('Ukuran Diameter Batang (cm) *'),
-            ),
-          ],
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF8E1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: [
-                const Text(
-                  'Jenis Pekerjaan',
-                  style: TextStyle(fontSize: 12, color: muted),
-                ),
-                const Spacer(),
-                Text(
-                  _jenisPekerjaan.isEmpty ? '-' : _jenisPekerjaan,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: navy,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-
-  Widget _fotoCard() => _card(
-        'Foto Sesudah',
-        [
-          GestureDetector(
-            onTap: _onFotoTap,
-            child: Container(
-              height: 160,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: _fotoSesudah.isNotEmpty ? blue : line,
-                  width: _fotoSesudah.isNotEmpty ? 1.4 : 1,
-                ),
-              ),
-              child: _fotoSesudah.isNotEmpty &&
-                      File(_fotoSesudah).existsSync()
-                  ? Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(13),
-                          child: Image.file(
-                            File(_fotoSesudah),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        Positioned(
-                          right: 8,
-                          top: 8,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xCC071B30),
-                              borderRadius: BorderRadius.circular(100),
-                            ),
-                            child: const Text(
-                              'Foto Sesudah',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          left: 8,
-                          bottom: 8,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xCC071B30),
-                              borderRadius: BorderRadius.circular(100),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.zoom_in, size: 14,
-                                    color: Colors.white),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Ketuk untuk lihat',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    )
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.photo_camera_back_rounded,
-                          color: blue,
-                          size: 40,
-                        ),
-                        const SizedBox(height: 8),
-                        _takingPhoto
-                            ? const Text(
-                                'Membuka kamera...',
-                                style: TextStyle(color: muted),
-                              )
-                            : const Text(
-                                'Ambil Foto Sesudah',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF334155),
-                                ),
-                              ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Landscape wajib \u2022 Pinch to zoom',
-                          style: TextStyle(fontSize: 11, color: muted),
-                        ),
-                      ],
-                    ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (_fotoSesudah.isNotEmpty) ...[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.folder_open_rounded, size: 14, color: blue),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'Lokasi file: $_lokasiSesudah',
-                    style: const TextStyle(fontSize: 11, color: muted),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-          ],
-          const Row(
-            children: [
-              Icon(Icons.gpp_good_rounded, size: 14, color: green),
-              SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Foto diberi tanda air otomatis dan disimpan ke folder temuan.',
-                  style: TextStyle(fontSize: 11, color: muted),
-                ),
-              ),
-            ],
-          ),
-        ],
-      );
-
-  Widget _card(String title, List<Widget> children) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
+  Widget _section(String number, String title, Widget child) => Container(
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: line),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                color: blue,
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-              ),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x10071B30),
+              blurRadius: 20,
+              offset: Offset(0, 7),
             ),
-            const SizedBox(height: 14),
-            ...children,
           ],
         ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: const BoxDecoration(
+              color: navy,
+              border: Border(top: BorderSide(color: amber, width: 3)),
+            ),
+            child: Row(children: [
+              Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: paleGold,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  number,
+                  style: const TextStyle(
+                    color: Color(0xFF765400),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ]),
+          ),
+          Padding(padding: const EdgeInsets.all(16), child: child),
+        ]),
       );
 
-  Widget _readRow(String label, String value) => Column(
+  Widget _woBody() => Column(children: [
+        _pair('Tanggal', _row.tanggal, 'Penyulang', _row.penyulang),
+        const SizedBox(height: 11),
+        _pair('Section', _row.section, 'Segmen', _row.segmen),
+        const SizedBox(height: 11),
+        _pair('Jenis Object', _row.jenisObject, 'Tier', _row.tier),
+        const SizedBox(height: 11),
+        _pair('Prioritas', _row.prioritas, 'Jenis Pohon', _row.jenisPohon),
+        if (_row.jarak != null || _row.tinggiPohon != null) ...[
+          const SizedBox(height: 11),
+          _pair(
+            'Jarak Jaringan',
+            _row.jarak == null ? '-' : '${_row.jarak} m',
+            'Tinggi Pohon',
+            _row.tinggiPohon == null ? '-' : '${_row.tinggiPohon} m',
+          ),
+        ],
+        const SizedBox(height: 14),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: paleGold,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: _datum('Temuan', _row.temuan),
+        ),
+        const SizedBox(height: 14),
+        InkWell(
+          onTap: _bukaMaps,
+          borderRadius: BorderRadius.circular(11),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F1FA),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Row(children: [
+              const Icon(Icons.map_rounded, color: blue, size: 19),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _row.koordinat.isEmpty
+                      ? 'Koordinat belum tersedia'
+                      : _row.koordinat,
+                  style: const TextStyle(
+                    color: blue,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const Icon(Icons.arrow_forward_rounded, color: blue, size: 18),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(child: _sourcePhoto('Foto Temuan', _row.fotoTemuan, _row.linkFoto)),
+          const SizedBox(width: 10),
+          Expanded(child: _sourcePhoto('Foto Sekitar', _row.fotoLingkungan, _row.linkLingkungan)),
+        ]),
+      ]);
+
+  Widget _pair(String leftLabel, String left, String rightLabel, String right) =>
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Expanded(child: _datum(leftLabel, left)),
+        const SizedBox(width: 12),
+        Expanded(child: _datum(rightLabel, right)),
+      ]);
+
+  Widget _datum(String label, String value) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            label,
+            label.toUpperCase(),
             style: const TextStyle(
-              fontSize: 10,
               color: muted,
-              fontWeight: FontWeight.w600,
-              letterSpacing: .3,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: .5,
             ),
           ),
-          const SizedBox(height: 5),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(11),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              value.isEmpty ? '-' : value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF0F172A),
-              ),
-            ),
+          const SizedBox(height: 2),
+          Text(
+            value.trim().isEmpty ? '-' : value,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
           ),
         ],
       );
 
+  Widget _sourcePhoto(String label, String local, String remote) {
+    final available = local.trim().isNotEmpty || remote.trim().isNotEmpty;
+    return Container(
+      height: 82,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F8FA),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFB8CBD3)),
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Icon(Icons.image_outlined, color: blue),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+        Text(
+          available ? 'Tersedia' : 'Belum tersedia',
+          style: const TextStyle(fontSize: 10, color: muted),
+        ),
+      ]),
+    );
+  }
+
+  Widget _workBody() => Column(children: [
+        DropdownButtonFormField<String>(
+          value: WoRow.tindakLanjutOptions.contains(_tindakLanjut)
+              ? _tindakLanjut
+              : null,
+          hint: const Text('--Pilih Tindak Lanjut--'),
+          items: WoRow.tindakLanjutOptions
+              .map((value) => DropdownMenuItem(value: value, child: Text(value)))
+              .toList(),
+          onChanged: _editable
+              ? (value) => setState(() => _tindakLanjut = value)
+              : null,
+          decoration: _inputDecoration('Tindak Lanjut *'),
+        ),
+        if (_isTebang) ...[
+          const SizedBox(height: 12),
+          TextField(
+            controller: _diameterCtrl,
+            enabled: _editable,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            onChanged: (_) => setState(() {}),
+            decoration: _inputDecoration('Ukuran Diameter Batang (cm) *'),
+          ),
+        ],
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: paleGold,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(children: [
+            const Text('Jenis Pekerjaan', style: TextStyle(fontSize: 12, color: muted)),
+            const Spacer(),
+            Text(
+              _jenisPekerjaan.isEmpty ? '-' : _jenisPekerjaan,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+            ),
+          ]),
+        ),
+      ]);
+
+  Widget _evidenceBody() {
+    final exists = _fotoSesudah.isNotEmpty && File(_fotoSesudah).existsSync();
+    return GestureDetector(
+      onTap: _onFotoTap,
+      child: Container(
+        height: 170,
+        alignment: Alignment.center,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF4F8FA),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: exists ? blue : const Color(0xFF9CB9C4)),
+        ),
+        child: exists
+            ? Image.file(File(_fotoSesudah), width: double.infinity, fit: BoxFit.cover)
+            : Column(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.camera_alt_outlined, size: 34, color: blue),
+                const SizedBox(height: 8),
+                Text(
+                  _takingPhoto ? 'Membuka kamera...' : 'Ambil Foto Sesudah',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Gunakan orientasi lanskap',
+                  style: TextStyle(fontSize: 11, color: muted),
+                ),
+              ]),
+      ),
+    );
+  }
+
   InputDecoration _inputDecoration(String label) => InputDecoration(
         labelText: label,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: line),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: line),
