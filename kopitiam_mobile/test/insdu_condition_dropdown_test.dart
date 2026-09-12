@@ -22,6 +22,20 @@ List<String?> options(WidgetTester tester, String label) {
       .toList();
 }
 
+Future<void> buildUntilVisible(
+  WidgetTester tester,
+  Finder list,
+  Finder target,
+) async {
+  for (var attempt = 0; attempt < 20 && target.evaluate().isEmpty; attempt++) {
+    await tester.drag(list, const Offset(0, -500));
+    await tester.pumpAndSettle();
+  }
+  expect(target, findsOneWidget);
+  await tester.ensureVisible(target);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   setUpAll(() {
     sqfliteFfiInit();
@@ -49,19 +63,10 @@ void main() {
     expect(find.text('01'), findsOneWidget);
     expect(find.text('Identitas Gardu'), findsOneWidget);
 
-    await tester.drag(list, const Offset(0, -650));
-    await tester.pumpAndSettle();
-    expect(find.text('Pengukuran WBP'), findsOneWidget);
+    await buildUntilVisible(tester, list, find.text('Pengukuran WBP'));
+    await buildUntilVisible(tester, list, find.text('Pengukuran LWBP'));
 
-    await tester.drag(list, const Offset(0, -900));
-    await tester.pumpAndSettle();
-    expect(find.text('Pengukuran LWBP'), findsOneWidget);
-
-    await tester.scrollUntilVisible(
-      field('Cover FCO Atas'),
-      500,
-      scrollable: find.descendant(of: list, matching: find.byType(Scrollable)).first,
-    );
+    await buildUntilVisible(tester, list, field('Cover FCO Atas'));
     expect(options(tester, 'Cover FCO Atas'), [
       'Lengkap',
       'Tidak Lengkap',
@@ -69,11 +74,7 @@ void main() {
       'Tidak ada',
     ]);
 
-    await tester.scrollUntilVisible(
-      field('Jumperan Atas'),
-      250,
-      scrollable: find.descendant(of: list, matching: find.byType(Scrollable)).first,
-    );
+    await buildUntilVisible(tester, list, field('Jumperan Atas'));
     expect(options(tester, 'Jumperan Atas'), [
       'A3C',
       'A3CS (Lengkap)',
