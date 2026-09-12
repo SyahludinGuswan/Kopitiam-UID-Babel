@@ -66,16 +66,16 @@ void main() {
     await buildUntilVisible(tester, list, find.text('Pengukuran WBP'));
     await buildUntilVisible(tester, list, find.text('Pengukuran LWBP'));
 
-    await buildUntilVisible(tester, list, field('Cover FCO Atas'));
-    expect(options(tester, 'Cover FCO Atas'), [
+    await buildUntilVisible(tester, list, field('COVER FCO ATAS'));
+    expect(options(tester, 'COVER FCO ATAS'), [
       'Lengkap',
       'Tidak Lengkap',
       'Rusak',
       'Tidak ada',
     ]);
 
-    await buildUntilVisible(tester, list, field('Jumperan Atas'));
-    expect(options(tester, 'Jumperan Atas'), [
+    await buildUntilVisible(tester, list, field('JUMPERAN ATAS'));
+    expect(options(tester, 'JUMPERAN ATAS'), [
       'A3C',
       'A3CS (Lengkap)',
       'A3CS (Tidak Lengkap)',
