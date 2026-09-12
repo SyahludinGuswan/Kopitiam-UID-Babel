@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kopitiam_mobile/models/wo_insdu.dart';
 import 'package:kopitiam_mobile/screens/wo_insdu_form_screen.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 Finder field(String label) => find.byWidgetPredicate(
   (widget) =>
@@ -21,8 +22,27 @@ List<String?> options(WidgetTester tester, String label) {
       .toList();
 }
 
+Future<void> buildUntilVisible(
+  WidgetTester tester,
+  Finder list,
+  Finder target,
+) async {
+  for (var attempt = 0; attempt < 20 && target.evaluate().isEmpty; attempt++) {
+    await tester.drag(list, const Offset(0, -500));
+    await tester.pumpAndSettle();
+  }
+  expect(target, findsOneWidget);
+  await tester.ensureVisible(target);
+  await tester.pumpAndSettle();
+}
+
 void main() {
-  testWidgets('cover dan jumper memakai kriteria dropdown yang ditetapkan', (
+  setUpAll(() {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  });
+
+  testWidgets('form Gardu memakai enam bagian dan dropdown kondisi tetap lengkap', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -30,6 +50,7 @@ void main() {
         home: WoInsduFormScreen(
           existing: WoInsdu(
             kodeWo: 'INSDU-001',
+            nomorGardu: 'GD-101',
             statusWo: WoInsdu.statusDalam,
           ),
           sesi: {'subTim': 'Inspeksi Gardu'},
@@ -37,23 +58,24 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Pengukuran'));
-    await tester.pumpAndSettle();
 
-    final scrollable = find.descendant(
-      of: find.byType(ListView),
-      matching: find.byType(Scrollable),
-    ).first;
-    await tester.scrollUntilVisible(field('Cover FCO Atas'), 400, scrollable: scrollable);
-    expect(options(tester, 'Cover FCO Atas'), [
+    final list = find.byType(ListView).first;
+    expect(find.text('01'), findsOneWidget);
+    expect(find.text('Identitas Gardu'), findsOneWidget);
+
+    await buildUntilVisible(tester, list, find.text('Pengukuran WBP'));
+    await buildUntilVisible(tester, list, find.text('Pengukuran LWBP'));
+
+    await buildUntilVisible(tester, list, field('COVER FCO ATAS'));
+    expect(options(tester, 'COVER FCO ATAS'), [
       'Lengkap',
       'Tidak Lengkap',
       'Rusak',
       'Tidak ada',
     ]);
 
-    await tester.scrollUntilVisible(field('Jumperan Atas'), 250, scrollable: scrollable);
-    expect(options(tester, 'Jumperan Atas'), [
+    await buildUntilVisible(tester, list, field('JUMPERAN ATAS'));
+    expect(options(tester, 'JUMPERAN ATAS'), [
       'A3C',
       'A3CS (Lengkap)',
       'A3CS (Tidak Lengkap)',
