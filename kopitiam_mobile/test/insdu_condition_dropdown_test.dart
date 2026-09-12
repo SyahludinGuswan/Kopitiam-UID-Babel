@@ -45,17 +45,23 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final scrollable = find.descendant(
-      of: find.byType(ListView).first,
-      matching: find.byType(Scrollable),
-    ).first;
+    final list = find.byType(ListView).first;
     expect(find.text('01'), findsOneWidget);
     expect(find.text('Identitas Gardu'), findsOneWidget);
+
+    await tester.drag(list, const Offset(0, -650));
+    await tester.pumpAndSettle();
     expect(find.text('Pengukuran WBP'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Pengukuran LWBP'), 350, scrollable: scrollable);
+
+    await tester.drag(list, const Offset(0, -900));
+    await tester.pumpAndSettle();
     expect(find.text('Pengukuran LWBP'), findsOneWidget);
 
-    await tester.scrollUntilVisible(field('Cover FCO Atas'), 500, scrollable: scrollable);
+    await tester.scrollUntilVisible(
+      field('Cover FCO Atas'),
+      500,
+      scrollable: find.descendant(of: list, matching: find.byType(Scrollable)).first,
+    );
     expect(options(tester, 'Cover FCO Atas'), [
       'Lengkap',
       'Tidak Lengkap',
@@ -63,7 +69,11 @@ void main() {
       'Tidak ada',
     ]);
 
-    await tester.scrollUntilVisible(field('Jumperan Atas'), 250, scrollable: scrollable);
+    await tester.scrollUntilVisible(
+      field('Jumperan Atas'),
+      250,
+      scrollable: find.descendant(of: list, matching: find.byType(Scrollable)).first,
+    );
     expect(options(tester, 'Jumperan Atas'), [
       'A3C',
       'A3CS (Lengkap)',
