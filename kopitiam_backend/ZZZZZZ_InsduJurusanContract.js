@@ -65,6 +65,47 @@ function validateInsduCoordinates_(incoming) {
   return { wbp: insduCapture_(incoming, 'WBP'), lwbp: insduCapture_(incoming, 'LWBP') };
 }
 
+function insduDistanceMeters_(from, to) {
+  var radians = Math.PI / 180;
+  var dLatitude = (to.latitude - from.latitude) * radians;
+  var dLongitude = (to.longitude - from.longitude) * radians;
+  var latitude1 = from.latitude * radians;
+  var latitude2 = to.latitude * radians;
+  var a = Math.sin(dLatitude / 2) * Math.sin(dLatitude / 2) +
+    Math.cos(latitude1) * Math.cos(latitude2) * Math.sin(dLongitude / 2) * Math.sin(dLongitude / 2);
+  return Math.round(6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 10) / 10;
+}
+
+function insduCentralCoordinate_(row) {
+  var combined = String(row['Koordinat Gardu'] == null ? '' : row['Koordinat Gardu']).trim();
+  if (combined) {
+    try { return insduCoordinate_(combined, 'Koordinat Gardu'); } catch (_) {}
+  }
+  var latitude = Number(String(row.Lat == null ? '' : row.Lat).trim().replace(',', '.'));
+  var longitude = Number(String(row.Long == null ? '' : row.Long).trim().replace(',', '.'));
+  if (isFinite(latitude) && isFinite(longitude) && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180 && (latitude !== 0 || longitude !== 0)) {
+    return { latitude: latitude, longitude: longitude };
+  }
+  return null;
+}
+
+function insduApplyServerDistances_(session, sheet, rows) {
+  var values = sheet.getDataRange().getDisplayValues();
+  var headers = (values[0] || []).map(function (value) { return String(value).trim(); });
+  var targets = woVerifiedPrepareTargets_(session, values, headers, rows);
+  return targets.prepared.map(function (target) {
+    var incoming = {};
+    Object.keys(target.incoming).forEach(function (key) { incoming[key] = target.incoming[key]; });
+    var server = {};
+    headers.forEach(function (header, column) { server[header] = values[target.rowIndex][column]; });
+    var gardu = insduCentralCoordinate_(server);
+    var captures = validateInsduCoordinates_(incoming);
+    incoming['Jarak Antar Gardu ke Petugas (WBP)'] = gardu ? insduDistanceMeters_(gardu, captures.wbp.coordinate) : '';
+    incoming['Jarak Antar Gardu ke Petugas (LWBP)'] = gardu ? insduDistanceMeters_(gardu, captures.lwbp.coordinate) : '';
+    return incoming;
+  });
+}
+
 function syncWoInsduContract_(token, rows) {
   if (!Array.isArray(rows) || rows.length > 100) return fail_('BATCH_INVALID', 'Maksimal 100 WO per sinkronisasi.');
   try {
@@ -72,6 +113,12 @@ function syncWoInsduContract_(token, rows) {
       validateInsduJurusan_(rows[i] || {});
       validateInsduCoordinates_(rows[i] || {});
     }
+    var auth = cekSesi_(token);
+    if (!auth.success) return auth;
+    var access = woCoreAccess_(auth.sesi, 'insdu');
+    if (!access.success) return access;
+    var source = woCoreSheet_(CONFIG.WO_INSDU_SHEET || 'WO_Ins_Du');
+    var normalizedRows = insduApplyServerDistances_(auth.sesi, source.sheet, rows);
     [
       'jurusan terpasang', 'jurusan terpakai',
       'koordinat penginputan wbp', 'waktu penginputan wbp', 'jarak antar gardu ke petugas (wbp)',
@@ -79,8 +126,8 @@ function syncWoInsduContract_(token, rows) {
     ].forEach(function (header) {
       if (WO_CORE_MUTABLE.insdu.indexOf(header) < 0) WO_CORE_MUTABLE.insdu.push(header);
     });
-    return syncWoCoreCommitted_(token, 'insdu', CONFIG.WO_INSDU_SHEET || 'WO_Ins_Du', rows);
+    return syncWoCoreCommitted_(token, 'insdu', CONFIG.WO_INSDU_SHEET || 'WO_Ins_Du', normalizedRows);
   } catch (error) {
-    return fail_(error.insduCode || 'INSDU_CONTRACT_INVALID', error.message || 'Kontrak Insdu tidak valid.');
+    return fail_(error.insduCode || error.woCode || 'INSDU_CONTRACT_INVALID', error.message || 'Kontrak Insdu tidak valid.');
   }
 }

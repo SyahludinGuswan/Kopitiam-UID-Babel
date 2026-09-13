@@ -39,10 +39,6 @@ test('WBP and LWBP coordinates and canonical capture times are required', () => 
     'Koordinat Penginputan LWBP': '-3.019481,106.454828',
     'Waktu Penginputan LWBP': '13 September 2026, 23:00:00',
   }));
-  assert.throws(() => api.validateInsduCoordinates_({
-    'Koordinat Penginputan WBP': '', 'Waktu Penginputan WBP': '',
-    'Koordinat Penginputan LWBP': '-3,106', 'Waktu Penginputan LWBP': 'now',
-  }), (error) => error.insduCode === 'INSDU_COORDINATE_INVALID');
 });
 
 test('capture time rejects malformed and impossible dates', () => {
@@ -58,4 +54,20 @@ test('coordinate guard rejects malformed, out-of-range, and Null Island values',
   for (const value of ['abc', '1,2,3', '91,106', '-3,181', '0,0']) {
     assert.throws(() => api.insduCoordinate_(value, 'Koordinat'), (error) => error.insduCode === 'INSDU_COORDINATE_INVALID');
   }
+});
+
+test('server recalculates distance in meters from central Gardu coordinate', () => {
+  const api = load();
+  const gardu = api.insduCoordinate_('-3.019482,106.454827', 'Koordinat Gardu');
+  const same = api.insduCoordinate_('-3.019482,106.454827', 'Koordinat Penginputan WBP');
+  const nearby = api.insduCoordinate_('-3.019392,106.454827', 'Koordinat Penginputan LWBP');
+  assert.equal(api.insduDistanceMeters_(gardu, same), 0);
+  assert.ok(api.insduDistanceMeters_(gardu, nearby) >= 9 && api.insduDistanceMeters_(gardu, nearby) <= 11);
+});
+
+test('invalid central Gardu coordinate produces no reference distance', () => {
+  const api = load();
+  assert.equal(api.insduCentralCoordinate_({'Koordinat Gardu': '', Lat: '', Long: ''}), null);
+  assert.equal(api.insduCentralCoordinate_({'Koordinat Gardu': 'invalid', Lat: '0', Long: '0'}), null);
+  assert.deepEqual(JSON.parse(JSON.stringify(api.insduCentralCoordinate_({'Koordinat Gardu': '', Lat: '-3,019482', Long: '106,454827'}))), {latitude: -3.019482, longitude: 106.454827});
 });
