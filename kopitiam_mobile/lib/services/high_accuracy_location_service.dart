@@ -25,11 +25,59 @@ class LocationFix {
   String get accuracyLabel => '${accuracy.toStringAsFixed(1)} m';
 }
 
+class GnssStabilityTracker {
+  final double maximumAccuracy;
+  final double stabilityRadius;
+  final int requiredSamples;
+  final List<Position> _stable = <Position>[];
+  Position? _best;
+
+  GnssStabilityTracker({
+    required this.maximumAccuracy,
+    required this.stabilityRadius,
+    required this.requiredSamples,
+  });
+
+  int get stableSamples => _stable.length;
+  Position? get best => _best;
+  bool get locked => _stable.length >= requiredSamples;
+
+  bool add(Position position) {
+    if (position.accuracy > maximumAccuracy) return false;
+    if (_stable.isEmpty) {
+      _stable.add(position);
+      _best = position;
+      return locked;
+    }
+
+    final anchor = _best!;
+    final distance = Geolocator.distanceBetween(
+      anchor.latitude,
+      anchor.longitude,
+      position.latitude,
+      position.longitude,
+    );
+    if (distance > stabilityRadius) {
+      _stable
+        ..clear()
+        ..add(position);
+      _best = position;
+      return false;
+    }
+
+    _stable.add(position);
+    if (position.accuracy < _best!.accuracy) _best = position;
+    return locked;
+  }
+}
+
 class HighAccuracyLocationService {
-  static const double lockAccuracy = 5;
-  static const int maxSamples = 30;
-  static const Duration maxDuration = Duration(seconds: 45);
-  static const Duration maxPositionAge = Duration(seconds: 30);
+  static const double lockAccuracy = 20;
+  static const double stabilityRadius = 10;
+  static const int requiredStableSamples = 3;
+  static const int maxSamples = 120;
+  static const Duration maxDuration = Duration(minutes: 2);
+  static const Duration maxPositionAge = Duration(seconds: 10);
 
   static Future<void> _ensureReady() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
@@ -68,8 +116,7 @@ class HighAccuracyLocationService {
         position.accuracy <= 0) {
       throw StateError('Data lokasi perangkat tidak valid.');
     }
-    final now = DateTime.now();
-    final age = now.difference(position.timestamp);
+    final age = DateTime.now().difference(position.timestamp);
     if (age > maxPositionAge || age < const Duration(minutes: -1)) {
       throw StateError(
         'Data GPS sudah kedaluwarsa atau waktu perangkat tidak valid.',
@@ -82,72 +129,43 @@ class HighAccuracyLocationService {
   }) async {
     await _ensureReady();
 
-    Position? best;
-    var samples = 0;
+    final tracker = GnssStabilityTracker(
+      maximumAccuracy: lockAccuracy,
+      stabilityRadius: stabilityRadius,
+      requiredSamples: requiredStableSamples,
+    );
+    var totalSamples = 0;
     Object? securityError;
+    final completer = Completer<void>();
+
+    void finish() {
+      if (!completer.isCompleted) completer.complete();
+    }
 
     void consider(Position position) {
       try {
         _assertTrusted(position);
       } catch (error) {
         securityError = error;
-        rethrow;
+        finish();
+        return;
       }
-      samples++;
-      if (best == null || position.accuracy < best!.accuracy) {
-        best = position;
-      }
-      final currentBest = best;
-      if (currentBest != null) {
-        onSample?.call(samples, currentBest.accuracy);
-      }
+      totalSamples++;
+      final locked = tracker.add(position);
+      final best = tracker.best;
+      if (best != null) onSample?.call(tracker.stableSamples, best.accuracy);
+      if (locked || totalSamples >= maxSamples) finish();
     }
 
-    try {
-      final initial = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.bestForNavigation,
-          timeLimit: Duration(seconds: 12),
-        ),
-      );
-      consider(initial);
-    } on TimeoutException {
-      // Stream berikutnya tetap mencoba pembacaan GPS.
-    } on StateError {
-      rethrow;
-    } catch (_) {
-      // Provider awal bisa belum siap; stream berikutnya tetap dicoba.
-    }
-
-    final initialBest = best;
-    if (initialBest != null && initialBest.accuracy <= lockAccuracy) {
-      return _toFix(initialBest, samples, true);
-    }
-
-    final completer = Completer<void>();
     late final StreamSubscription<Position> subscription;
     late final Timer deadline;
-
-    void finish() {
-      if (!completer.isCompleted) completer.complete();
-    }
-
     subscription = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.bestForNavigation,
         distanceFilter: 0,
       ),
     ).listen(
-      (position) {
-        try {
-          consider(position);
-          if (position.accuracy <= lockAccuracy || samples >= maxSamples) {
-            finish();
-          }
-        } catch (_) {
-          finish();
-        }
-      },
+      consider,
       onError: (_) => finish(),
       cancelOnError: false,
     );
@@ -161,23 +179,31 @@ class HighAccuracyLocationService {
     }
 
     if (securityError != null) throw securityError!;
-    final result = best;
-    if (result == null) {
-      throw StateError('Koordinat tidak terbaca. Coba lagi di area terbuka.');
+    final best = tracker.best;
+    if (best == null) {
+      throw StateError(
+        'GNSS belum mendapat akurasi 20 m. Coba lagi di area terbuka.',
+      );
     }
-    _assertTrusted(result);
-    return _toFix(result, samples, result.accuracy <= lockAccuracy);
+    if (!tracker.locked) {
+      throw StateError(
+        'Koordinat belum stabil. Dibutuhkan 3 sampel dalam radius 10 m; '
+        'coba ulang di area terbuka.',
+      );
+    }
+    _assertTrusted(best);
+    return _toFix(best, tracker.stableSamples);
   }
 
-  static LocationFix _toFix(Position position, int samples, bool locked) {
+  static LocationFix _toFix(Position position, int samples) {
     _assertTrusted(position);
     return LocationFix(
       latitude: position.latitude,
       longitude: position.longitude,
       accuracy: position.accuracy,
-      capturedAt: DateTime.now(),
+      capturedAt: position.timestamp,
       samples: samples,
-      locked: locked,
+      locked: true,
     );
   }
 
