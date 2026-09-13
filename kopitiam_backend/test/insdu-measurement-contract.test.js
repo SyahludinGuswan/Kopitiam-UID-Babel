@@ -1,0 +1,8 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const source=fs.readFileSync(path.join(__dirname,'../ZZZZZZ_InsduJurusanContract.js'),'utf8');
+function load(){const sandbox={};vm.createContext(sandbox);vm.runInContext(source,sandbox);return sandbox;}
+function valid(api){const row={};for(const field of api.INSDU_CURRENT_FIELDS_)row[field]='0';for(const field of api.INSDU_VOLTAGE_FIELDS_)row[field]='220,5';return row;}
+test('all current fields are required, finite, non-negative, and may be zero',()=>{const api=load(),row=valid(api);assert.doesNotThrow(()=>api.validateInsduMeasurements_(row));for(const value of ['',-1,'NaN','Infinity','-Infinity','abc']){const changed={...row,[api.INSDU_CURRENT_FIELDS_[0]]:value};assert.throws(()=>api.validateInsduMeasurements_(changed),e=>['INSDU_MEASUREMENT_REQUIRED','INSDU_MEASUREMENT_INVALID'].includes(e.insduCode));}});
+test('all voltage fields must be within 100 through 999 inclusive',()=>{const api=load(),row=valid(api);for(const value of [100,'100,5',999])assert.doesNotThrow(()=>api.validateInsduMeasurements_({...row,[api.INSDU_VOLTAGE_FIELDS_[0]]:value}));for(const value of [0,99.9,999.1,1000])assert.throws(()=>api.validateInsduMeasurements_({...row,[api.INSDU_VOLTAGE_FIELDS_[0]]:value}),e=>e.insduCode==='INSDU_VOLTAGE_RANGE_INVALID');});
+test('decimal comma and decimal point normalize to the same numeric value',()=>{const api=load();assert.equal(api.insduFiniteNumber_('12,5','Arus'),12.5);assert.equal(api.insduFiniteNumber_('12.5','Arus'),12.5);});
