@@ -30,6 +30,51 @@ class WoInsduRepository {
     }
   }
 
+  static ({double latitude, double longitude}) _coordinate(
+    String value,
+    String label,
+  ) {
+    final parts = value.trim().split(',');
+    if (parts.length != 2) {
+      throw StateError('$label wajib direkam melalui GPS aplikasi.');
+    }
+    final latitude = double.tryParse(parts[0].trim());
+    final longitude = double.tryParse(parts[1].trim());
+    if (latitude == null ||
+        longitude == null ||
+        !latitude.isFinite ||
+        !longitude.isFinite ||
+        latitude < -90 ||
+        latitude > 90 ||
+        longitude < -180 ||
+        longitude > 180 ||
+        (latitude == 0 && longitude == 0)) {
+      throw StateError('$label tidak valid. Ambil ulang melalui GPS aplikasi.');
+    }
+    return (latitude: latitude, longitude: longitude);
+  }
+
+  static void validateCoordinates(WoInsdu wo, {required bool requireComplete}) {
+    final empty = wo.koordinatPenginputanWbp.trim().isEmpty &&
+        wo.koordinatPenginputanLwbp.trim().isEmpty &&
+        wo.waktuPenginputanWbp.trim().isEmpty &&
+        wo.waktuPenginputanLwbp.trim().isEmpty;
+    if (!requireComplete && empty) return;
+    _coordinate(wo.koordinatPenginputanWbp, 'Koordinat Penginputan WBP');
+    _coordinate(wo.koordinatPenginputanLwbp, 'Koordinat Penginputan LWBP');
+    if (wo.waktuPenginputanWbp.trim().isEmpty) {
+      throw StateError('Waktu Penginputan WBP wajib tersedia.');
+    }
+    if (wo.waktuPenginputanLwbp.trim().isEmpty) {
+      throw StateError('Waktu Penginputan LWBP wajib tersedia.');
+    }
+  }
+
+  static void validateContract(WoInsdu wo, {required bool requireComplete}) {
+    validateJurusan(wo, requireComplete: requireComplete);
+    validateCoordinates(wo, requireComplete: requireComplete);
+  }
+
   Future<Database> _database() async {
     final db = await _db.database;
     final info = await db.rawQuery('PRAGMA table_info($table)');
@@ -56,7 +101,7 @@ class WoInsduRepository {
   }
 
   Future<void> simpan(WoInsdu wo, {bool dirty = true}) async {
-    validateJurusan(wo, requireComplete: WoInsdu.normalisasiStatus(wo.statusWo) == WoInsdu.statusSelesai);
+    validateContract(wo, requireComplete: WoInsdu.normalisasiStatus(wo.statusWo) == WoInsdu.statusSelesai);
     final db = await _database();
     await db.insert(table, wo.toMap()..['is_dirty'] = dirty ? 1 : 0, conflictAlgorithm: ConflictAlgorithm.replace);
   }
@@ -95,7 +140,7 @@ class WoInsduRepository {
     final payload = <Map<String, dynamic>>[];
     for (final row in rows) {
       final wo = WoInsdu.fromMap(row);
-      validateJurusan(wo, requireComplete: true);
+      validateContract(wo, requireComplete: true);
       payload.add(wo.toRemote());
     }
     final response = await ApiService.syncWoInsdu(token, payload);
