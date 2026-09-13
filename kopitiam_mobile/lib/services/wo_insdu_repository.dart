@@ -15,6 +15,21 @@ class WoInsduRepository {
   final SqliteService _db = SqliteService.instance;
   static const table = 'wo_insdu';
 
+  static void validateJurusan(WoInsdu wo, {required bool requireComplete}) {
+    final installed = wo.jurusanTerpasang;
+    final used = wo.jurusanTerpakai;
+    if (!requireComplete && installed == null && used == null) return;
+    if (installed == null || installed < 1 || installed > 4) {
+      throw StateError('Jurusan Terpasang wajib berupa bilangan bulat 1 sampai 4.');
+    }
+    if (used == null || used < 1 || used > 4) {
+      throw StateError('Jurusan Terpakai wajib berupa bilangan bulat 1 sampai 4.');
+    }
+    if (used > installed) {
+      throw StateError('Jurusan Terpakai harus sama dengan atau lebih kecil dari Jurusan Terpasang.');
+    }
+  }
+
   Future<Database> _database() async {
     final db = await _db.database;
     final info = await db.rawQuery('PRAGMA table_info($table)');
@@ -41,6 +56,7 @@ class WoInsduRepository {
   }
 
   Future<void> simpan(WoInsdu wo, {bool dirty = true}) async {
+    validateJurusan(wo, requireComplete: WoInsdu.normalisasiStatus(wo.statusWo) == WoInsdu.statusSelesai);
     final db = await _database();
     await db.insert(table, wo.toMap()..['is_dirty'] = dirty ? 1 : 0, conflictAlgorithm: ConflictAlgorithm.replace);
   }
@@ -76,9 +92,15 @@ class WoInsduRepository {
     final db = await _database();
     final rows = await db.query(table, where: 'is_dirty = 1 AND status_wo = ?', whereArgs: [WoInsdu.statusSelesai]);
     if (rows.isEmpty) return const WoInsduSyncResult(total: 0, diproses: 0, pesan: 'Belum ada WO Inspeksi Gardu selesai yang siap disinkronkan.');
-    final response = await ApiService.syncWoInsdu(token, rows.map((row) => WoInsdu.fromMap(row).toRemote()).toList());
+    final payload = <Map<String, dynamic>>[];
+    for (final row in rows) {
+      final wo = WoInsdu.fromMap(row);
+      validateJurusan(wo, requireComplete: true);
+      payload.add(wo.toRemote());
+    }
+    final response = await ApiService.syncWoInsdu(token, payload);
     if (response['success'] != true) return WoInsduSyncResult(total: rows.length, diproses: 0, pesan: '${response['message'] ?? 'Sinkronisasi WO Inspeksi Gardu gagal.'}');
-    final done = (response['diproses'] as num?)?.toInt() ?? rows.length;
+    final done = (response['diproses'] as num?)?.toInt() ?? 0;
     if (done != rows.length) return WoInsduSyncResult(total: rows.length, diproses: done, pesan: 'Konfirmasi server tidak lengkap. Data lokal dipertahankan.');
     await db.transaction((txn) async { for (final row in rows) { await txn.delete(table, where: 'kode_wo = ? AND status_wo = ?', whereArgs: [row['kode_wo'], WoInsdu.statusSelesai]); } });
     return WoInsduSyncResult(total: rows.length, diproses: done);

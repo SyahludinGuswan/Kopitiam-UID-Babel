@@ -16,7 +16,7 @@ function doPost(e) {
     if (action === 'getWoInsjar') return json_(getWoInsjar_(body.token));
     if (action === 'syncWoInsjar') return json_(syncWoCoreCommitted_(body.token, 'insjar', CONFIG.WO_INSJAR_SHEET, body.rows));
     if (action === 'getWoInsdu') return json_(getWoInsdu_(body.token));
-    if (action === 'syncWoInsdu') return json_(syncWoCoreCommitted_(body.token, 'insdu', CONFIG.WO_INSDU_SHEET || 'WO_Ins_Du', body.rows));
+    if (action === 'syncWoInsdu') return json_(syncWoInsduContract_(body.token, body.rows));
     if (action === 'getWoRow') return json_(getWoRow_(body.token));
     if (action === 'syncWoRow') return json_(syncWoCoreCommitted_(body.token, 'row', CONFIG.WO_ROW_SHEET, body.rows));
     if (action === 'getWoHarJar') return json_(getHarExecution_(body.token, 'jar'));
