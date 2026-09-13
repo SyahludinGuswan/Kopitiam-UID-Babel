@@ -1,0 +1,3 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:kopitiam_mobile/screens/insdu_capacity_guard.dart';
+void main(){test('phase and neutral warnings follow current capacity',(){final warnings=InsduCapacityGuard.evaluate(capacity:100,values:{'bebanUtamaRWbp':145,'bebanUtamaSWbp':140,'bebanUtamaTWbp':144,'bebanJurusanNWbp':101,'bebanUtamaRLwbp':0,'bebanUtamaSLwbp':0,'bebanUtamaTLwbp':0,'bebanJurusanNLwbp':0});expect(warnings.map((e)=>e.phase),containsAll(['Fasa R','Netral N']));expect(warnings.length,2);});test('changing capacity changes phase warning threshold',(){final values={'bebanUtamaRWbp':150.0};expect(InsduCapacityGuard.evaluate(capacity:100,values:values),isNotEmpty);expect(InsduCapacityGuard.evaluate(capacity:160,values:values),isEmpty);});}

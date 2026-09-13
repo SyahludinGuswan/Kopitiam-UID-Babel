@@ -1,0 +1,4 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:kopitiam_mobile/models/wo_insdu.dart';
+import 'package:kopitiam_mobile/services/wo_insdu_repository.dart';
+void main(){test('capacity options calculate a 400 V phase-current limit',(){for(final capacity in WoInsdu.kapasitasOptions){final wo=WoInsdu(kodeWo:'WO-1',kapasitas:capacity,arusMaksimalPerFasa:WoInsdu.maximumPhaseCurrent(capacity));expect(()=>WoInsduRepository.validateCapacity(wo,requireComplete:true),returnsNormally);}expect(WoInsdu.maximumPhaseCurrent(100),closeTo(144.337,0.01));});test('unsupported or mismatched capacity guard is rejected',(){expect(()=>WoInsduRepository.validateCapacity(const WoInsdu(kodeWo:'WO-1',kapasitas:75,arusMaksimalPerFasa:108),requireComplete:true),throwsStateError);expect(()=>WoInsduRepository.validateCapacity(const WoInsdu(kodeWo:'WO-1',kapasitas:100,arusMaksimalPerFasa:100),requireComplete:true),throwsStateError);});}

@@ -1,86 +1,30 @@
 import 'package:sqflite/sqflite.dart';
-
 import '../models/wo_insdu.dart';
+import '../models/wo_insjar.dart';
 import 'api_service.dart';
 import 'sqlite_service.dart';
 
-class WoInsduSyncResult {
-  final int total;
-  final int diproses;
-  final String? pesan;
-  const WoInsduSyncResult({required this.total, required this.diproses, this.pesan});
-}
-
+class WoInsduSyncResult { final int total,diproses; final String? pesan; const WoInsduSyncResult({required this.total,required this.diproses,this.pesan}); }
 class WoInsduRepository {
-  final SqliteService _db = SqliteService.instance;
-  static const table = 'wo_insdu';
-
-  Future<Database> _database() async {
-    final db = await _db.database;
-    final info = await db.rawQuery('PRAGMA table_info($table)');
-    final columns = info.map((row) => '${row['name']}').toSet();
-    for (final entry in const {
-      'waktu_penginputan_wbp': "TEXT NOT NULL DEFAULT ''",
-      'waktu_penginputan_lwbp': "TEXT NOT NULL DEFAULT ''",
-    }.entries) {
-      if (!columns.contains(entry.key)) await db.execute('ALTER TABLE $table ADD COLUMN ${entry.key} ${entry.value}');
-    }
-    return db;
+  final SqliteService _db=SqliteService.instance; static const table='wo_insdu';
+  static void validateJurusan(WoInsdu wo,{required bool requireComplete}){final installed=wo.jurusanTerpasang,used=wo.jurusanTerpakai;if(!requireComplete&&installed==null&&used==null)return;if(installed==null||installed<1||installed>4)throw StateError('Jurusan Terpasang wajib berupa bilangan bulat 1 sampai 4.');if(used==null||used<1||used>4)throw StateError('Jurusan Terpakai wajib berupa bilangan bulat 1 sampai 4.');if(used>installed)throw StateError('Jurusan Terpakai harus sama dengan atau lebih kecil dari Jurusan Terpasang.');}
+  static void validateCapacity(WoInsdu wo,{required bool requireComplete}){final capacity=wo.kapasitas;if(!requireComplete&&capacity==null)return;if(capacity==null||!WoInsdu.kapasitasOptions.contains(capacity))throw StateError('Kapasitas wajib dipilih: 25, 50, 100, 160, 200, atau 250 kVA.');final expected=WoInsdu.maximumPhaseCurrent(capacity),stored=wo.arusMaksimalPerFasa;if(stored==null||!stored.isFinite||(stored-expected).abs()>0.01)throw StateError('Batas arus per fasa tidak cocok dengan kapasitas trafo.');}
+  static void _current(double? value,String label,{required bool requireComplete}){if(value==null){if(requireComplete)throw StateError('$label wajib diisi.');return;}if(!value.isFinite||value<0)throw StateError('$label wajib berupa angka finite dan tidak negatif.');}
+  static void _voltage(double? value,String label,{required bool requireComplete}){if(value==null){if(requireComplete)throw StateError('$label wajib diisi.');return;}if(!value.isFinite||value<100||value>999)throw StateError('$label wajib berada pada rentang 100 sampai 999 V.');}
+  static void validateMeasurements(WoInsdu wo,{required bool requireComplete}){
+    final currents=<String,double?>{'Beban Utama R WBP':wo.bebanUtamaRWbp,'Beban Utama S WBP':wo.bebanUtamaSWbp,'Beban Utama T WBP':wo.bebanUtamaTWbp,'Beban Jurusan N WBP':wo.bebanJurusanNWbp,'Beban Utama R LWBP':wo.bebanUtamaRLwbp,'Beban Utama S LWBP':wo.bebanUtamaSLwbp,'Beban Utama T LWBP':wo.bebanUtamaTLwbp,'Beban Jurusan N LWBP':wo.bebanJurusanNLwbp};
+    final voltages=<String,double?>{'Tegangan R-S WBP':wo.teganganRswbp,'Tegangan S-T WBP':wo.teganganStwbp,'Tegangan R-T WBP':wo.teganganRtwbp,'Tegangan R-N WBP':wo.teganganRnwbp,'Tegangan S-N WBP':wo.teganganSnwbp,'Tegangan T-N WBP':wo.teganganTnwbp,'Tegangan R-S LWBP':wo.teganganRslwbp,'Tegangan S-T LWBP':wo.teganganStlwbp,'Tegangan R-T LWBP':wo.teganganRtlwbp,'Tegangan R-N LWBP':wo.teganganRnlwbp,'Tegangan S-N LWBP':wo.teganganSnlwbp,'Tegangan T-N LWBP':wo.teganganTnlwbp};
+    for(final entry in currents.entries){_current(entry.value,entry.key,requireComplete:requireComplete);}for(final entry in voltages.entries){_voltage(entry.value,entry.key,requireComplete:requireComplete);}
   }
-
-  Future<List<WoInsdu>> semua() async {
-    final db = await _database();
-    final rows = await db.query(table, orderBy: "CASE status_wo WHEN '${WoInsdu.statusMulai}' THEN 0 WHEN '${WoInsdu.statusDalam}' THEN 1 ELSE 2 END, tanggal DESC, kode_wo DESC");
-    return rows.map(WoInsdu.fromMap).toList();
-  }
-
-  Future<WoInsdu?> cari(String kodeWo) async {
-    final db = await _database();
-    final rows = await db.query(table, where: 'kode_wo = ?', whereArgs: [kodeWo], limit: 1);
-    return rows.isEmpty ? null : WoInsdu.fromMap(rows.first);
-  }
-
-  Future<void> simpan(WoInsdu wo, {bool dirty = true}) async {
-    final db = await _database();
-    await db.insert(table, wo.toMap()..['is_dirty'] = dirty ? 1 : 0, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
-  Future<void> mulaiPekerjaan(String kodeWo) async {
-    final db = await _database();
-    await db.update(table, {'status_wo': WoInsdu.statusDalam}, where: 'kode_wo = ? AND status_wo = ?', whereArgs: [kodeWo, WoInsdu.statusMulai]);
-  }
-
-  Future<WoInsduSyncResult> download(String token) async {
-    final response = await ApiService.getWoInsdu(token);
-    if (response['success'] == true && response['rows'] is List && (response['rows'] as List).isEmpty) {
-      final totalSheet = (response['totalSheet'] as num?)?.toInt() ?? 0;
-      final rejectedByUlp = (response['rejectedByUlp'] as num?)?.toInt() ?? 0;
-      if (totalSheet > 0 && rejectedByUlp > 0) return WoInsduSyncResult(total: 0, diproses: 0, pesan: 'Ditemukan $totalSheet data WO Inspeksi Gardu, tetapi $rejectedByUlp tidak cocok dengan Kode ULP akun Anda.');
-    }
-    if (response['success'] != true || response['rows'] is! List) return WoInsduSyncResult(total: 0, diproses: 0, pesan: '${response['message'] ?? 'Data WO Inspeksi Gardu tidak valid.'}');
-    final db = await _database();
-    var added = 0;
-    for (final raw in response['rows'] as List) {
-      if (raw is! Map) continue;
-      final wo = WoInsdu.fromRemote(Map<String, dynamic>.from(raw));
-      if (wo.kodeWo.isEmpty) continue;
-      final exists = await db.query(table, columns: ['kode_wo'], where: 'kode_wo = ?', whereArgs: [wo.kodeWo], limit: 1);
-      if (exists.isNotEmpty) continue;
-      await db.insert(table, wo.toMap()..['is_dirty'] = 0);
-      added++;
-    }
-    return WoInsduSyncResult(total: added, diproses: added);
-  }
-
-  Future<WoInsduSyncResult> sinkron(String token) async {
-    final db = await _database();
-    final rows = await db.query(table, where: 'is_dirty = 1 AND status_wo = ?', whereArgs: [WoInsdu.statusSelesai]);
-    if (rows.isEmpty) return const WoInsduSyncResult(total: 0, diproses: 0, pesan: 'Belum ada WO Inspeksi Gardu selesai yang siap disinkronkan.');
-    final response = await ApiService.syncWoInsdu(token, rows.map((row) => WoInsdu.fromMap(row).toRemote()).toList());
-    if (response['success'] != true) return WoInsduSyncResult(total: rows.length, diproses: 0, pesan: '${response['message'] ?? 'Sinkronisasi WO Inspeksi Gardu gagal.'}');
-    final done = (response['diproses'] as num?)?.toInt() ?? rows.length;
-    if (done != rows.length) return WoInsduSyncResult(total: rows.length, diproses: done, pesan: 'Konfirmasi server tidak lengkap. Data lokal dipertahankan.');
-    await db.transaction((txn) async { for (final row in rows) { await txn.delete(table, where: 'kode_wo = ? AND status_wo = ?', whereArgs: [row['kode_wo'], WoInsdu.statusSelesai]); } });
-    return WoInsduSyncResult(total: rows.length, diproses: done);
-  }
+  static ({double latitude,double longitude}) _coordinate(String value,String label){final parts=value.trim().split(',');if(parts.length!=2)throw StateError('$label wajib direkam melalui GPS aplikasi.');final lat=double.tryParse(parts[0].trim()),long=double.tryParse(parts[1].trim());if(lat==null||long==null||!lat.isFinite||!long.isFinite||lat< -90||lat>90||long< -180||long>180||(lat==0&&long==0))throw StateError('$label tidak valid. Ambil ulang melalui GPS aplikasi.');return(latitude:lat,longitude:long);}
+  static void _captureTime(String value,String label){final parsed=WoInsjar.parseStamp(value.trim());if(parsed==null||WoInsjar.stampLengkap(parsed)!=value.trim())throw StateError('$label wajib memakai format dd MMMM yyyy, HH:mm:ss.');}
+  static void validateCoordinates(WoInsdu wo,{required bool requireComplete}){final empty=wo.koordinatPenginputanWbp.trim().isEmpty&&wo.koordinatPenginputanLwbp.trim().isEmpty&&wo.waktuPenginputanWbp.trim().isEmpty&&wo.waktuPenginputanLwbp.trim().isEmpty;if(!requireComplete&&empty)return;_coordinate(wo.koordinatPenginputanWbp,'Koordinat Penginputan WBP');_coordinate(wo.koordinatPenginputanLwbp,'Koordinat Penginputan LWBP');_captureTime(wo.waktuPenginputanWbp,'Waktu Penginputan WBP');_captureTime(wo.waktuPenginputanLwbp,'Waktu Penginputan LWBP');}
+  static void validateContract(WoInsdu wo,{required bool requireComplete}){validateJurusan(wo,requireComplete:requireComplete);validateCapacity(wo,requireComplete:requireComplete);validateMeasurements(wo,requireComplete:requireComplete);validateCoordinates(wo,requireComplete:requireComplete);}
+  Future<Database> _database()async{final db=await _db.database;final info=await db.rawQuery('PRAGMA table_info($table)'),columns=info.map((r)=>'${r['name']}').toSet();for(final entry in const{'waktu_penginputan_wbp':"TEXT NOT NULL DEFAULT ''",'waktu_penginputan_lwbp':"TEXT NOT NULL DEFAULT ''",'kapasitas':'INTEGER','arus_maksimal_per_fasa':'REAL'}.entries){if(!columns.contains(entry.key))await db.execute('ALTER TABLE $table ADD COLUMN ${entry.key} ${entry.value}');}return db;}
+  Future<List<WoInsdu>> semua()async{final db=await _database();final rows=await db.query(table,orderBy:"CASE status_wo WHEN '${WoInsdu.statusMulai}' THEN 0 WHEN '${WoInsdu.statusDalam}' THEN 1 ELSE 2 END, tanggal DESC, kode_wo DESC");return rows.map(WoInsdu.fromMap).toList();}
+  Future<WoInsdu?> cari(String code)async{final db=await _database(),rows=await db.query(table,where:'kode_wo = ?',whereArgs:[code],limit:1);return rows.isEmpty?null:WoInsdu.fromMap(rows.first);}
+  Future<void> simpan(WoInsdu wo,{bool dirty=true})async{validateContract(wo,requireComplete:WoInsdu.normalisasiStatus(wo.statusWo)==WoInsdu.statusSelesai);final db=await _database();await db.insert(table,wo.toMap()..['is_dirty']=dirty?1:0,conflictAlgorithm:ConflictAlgorithm.replace);}
+  Future<void> mulaiPekerjaan(String code)async{final db=await _database();await db.update(table,{'status_wo':WoInsdu.statusDalam},where:'kode_wo = ? AND status_wo = ?',whereArgs:[code,WoInsdu.statusMulai]);}
+  Future<WoInsduSyncResult> download(String token)async{final response=await ApiService.getWoInsdu(token);if(response['success']!=true||response['rows'] is! List)return WoInsduSyncResult(total:0,diproses:0,pesan:'${response['message']??'Data WO Inspeksi Gardu tidak valid.'}');final db=await _database();var added=0;for(final raw in response['rows'] as List){if(raw is! Map)continue;final wo=WoInsdu.fromRemote(Map<String,dynamic>.from(raw));if(wo.kodeWo.isEmpty)continue;final exists=await db.query(table,columns:['kode_wo'],where:'kode_wo = ?',whereArgs:[wo.kodeWo],limit:1);if(exists.isNotEmpty)continue;await db.insert(table,wo.toMap()..['is_dirty']=0);added++;}return WoInsduSyncResult(total:added,diproses:added);}
+  Future<WoInsduSyncResult> sinkron(String token)async{final db=await _database(),rows=await db.query(table,where:'is_dirty = 1 AND status_wo = ?',whereArgs:[WoInsdu.statusSelesai]);if(rows.isEmpty)return const WoInsduSyncResult(total:0,diproses:0,pesan:'Belum ada WO Inspeksi Gardu selesai yang siap disinkronkan.');final payload=<Map<String,dynamic>>[];for(final row in rows){final wo=WoInsdu.fromMap(row);validateContract(wo,requireComplete:true);payload.add(wo.toRemote());}final response=await ApiService.syncWoInsdu(token,payload);if(response['success']!=true)return WoInsduSyncResult(total:rows.length,diproses:0,pesan:'${response['message']??'Sinkronisasi WO Inspeksi Gardu gagal.'}');final done=(response['diproses'] as num?)?.toInt()??0;if(done!=rows.length)return WoInsduSyncResult(total:rows.length,diproses:done,pesan:'Konfirmasi server tidak lengkap. Data lokal dipertahankan.');await db.transaction((txn)async{for(final row in rows){await txn.delete(table,where:'kode_wo = ? AND status_wo = ?',whereArgs:[row['kode_wo'],WoInsdu.statusSelesai]);}});return WoInsduSyncResult(total:rows.length,diproses:done);}
 }
