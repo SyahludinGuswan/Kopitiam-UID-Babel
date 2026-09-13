@@ -6,6 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const crypto = require('node:crypto');
 
+const targetSource = fs.readFileSync(path.join(__dirname, '../ZZZZ_AllWoTargetSecure.js'), 'utf8');
 const source = fs.readFileSync(path.join(__dirname, '../ZZZZZ_WoCommitGuard.js'), 'utf8');
 function load() {
   const normalize = (value) => String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -17,6 +18,7 @@ function load() {
     digestBytes_: (bytes) => crypto.createHash('sha256').update(Buffer.from(bytes)).digest('hex'),
   };
   vm.createContext(sandbox);
+  vm.runInContext(targetSource, sandbox);
   vm.runInContext(source, sandbox);
   return sandbox;
 }
