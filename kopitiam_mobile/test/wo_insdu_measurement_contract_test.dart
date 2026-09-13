@@ -1,5 +1,84 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kopitiam_mobile/models/wo_insdu.dart';
 import 'package:kopitiam_mobile/services/wo_insdu_repository.dart';
-WoInsdu valid({double? current=0,double? voltage=220})=>WoInsdu(kodeWo:'WO-1',bebanUtamaRWbp:current,bebanUtamaSWbp:0,bebanUtamaTWbp:0,bebanJurusanNWbp:0,bebanUtamaRLwbp:0,bebanUtamaSLwbp:0,bebanUtamaTLwbp:0,bebanJurusanNLwbp:0,teganganRswbp:voltage,teganganStwbp:220,teganganRtwbp:220,teganganRnwbp:220,teganganSnwbp:220,teganganTnwbp:220,teganganRslwbp:220,teganganStlwbp:220,teganganRtlwbp:220,teganganRnlwbp:220,teganganSnlwbp:220,teganganTnlwbp:220);
-void main(){test('mobile accepts zero current and voltages from 100 through 999',(){expect(()=>WoInsduRepository.validateMeasurements(valid(),requireComplete:true),returnsNormally);expect(()=>WoInsduRepository.validateMeasurements(valid(voltage:100),requireComplete:true),returnsNormally);expect(()=>WoInsduRepository.validateMeasurements(valid(voltage:999),requireComplete:true),returnsNormally);});test('mobile blocks invalid values before local completion',(){for(final value in [double.nan,double.infinity,-1]){expect(()=>WoInsduRepository.validateMeasurements(valid(current:value),requireComplete:true),throwsStateError);}for(final value in [0,99.9,999.1,double.infinity]){expect(()=>WoInsduRepository.validateMeasurements(valid(voltage:value),requireComplete:true),throwsStateError);}});test('completed WO cannot omit any measurement',(){expect(()=>WoInsduRepository.validateMeasurements(valid(current:null),requireComplete:true),throwsStateError);});}
+
+WoInsdu valid({double? current = 0.0, double? voltage = 220.0}) => WoInsdu(
+      kodeWo: 'WO-1',
+      bebanUtamaRWbp: current,
+      bebanUtamaSWbp: 0,
+      bebanUtamaTWbp: 0,
+      bebanJurusanNWbp: 0,
+      bebanUtamaRLwbp: 0,
+      bebanUtamaSLwbp: 0,
+      bebanUtamaTLwbp: 0,
+      bebanJurusanNLwbp: 0,
+      teganganRswbp: voltage,
+      teganganStwbp: 220,
+      teganganRtwbp: 220,
+      teganganRnwbp: 220,
+      teganganSnwbp: 220,
+      teganganTnwbp: 220,
+      teganganRslwbp: 220,
+      teganganStlwbp: 220,
+      teganganRtlwbp: 220,
+      teganganRnlwbp: 220,
+      teganganSnlwbp: 220,
+      teganganTnlwbp: 220,
+    );
+
+void main() {
+  test('mobile accepts zero current and voltages from 100 through 999', () {
+    expect(
+      () => WoInsduRepository.validateMeasurements(
+        valid(),
+        requireComplete: true,
+      ),
+      returnsNormally,
+    );
+    expect(
+      () => WoInsduRepository.validateMeasurements(
+        valid(voltage: 100),
+        requireComplete: true,
+      ),
+      returnsNormally,
+    );
+    expect(
+      () => WoInsduRepository.validateMeasurements(
+        valid(voltage: 999),
+        requireComplete: true,
+      ),
+      returnsNormally,
+    );
+  });
+
+  test('mobile blocks invalid values before local completion', () {
+    for (final value in <double>[double.nan, double.infinity, -1.0]) {
+      expect(
+        () => WoInsduRepository.validateMeasurements(
+          valid(current: value),
+          requireComplete: true,
+        ),
+        throwsStateError,
+      );
+    }
+    for (final value in <double>[0.0, 99.9, 999.1, double.infinity]) {
+      expect(
+        () => WoInsduRepository.validateMeasurements(
+          valid(voltage: value),
+          requireComplete: true,
+        ),
+        throwsStateError,
+      );
+    }
+  });
+
+  test('completed WO cannot omit any measurement', () {
+    expect(
+      () => WoInsduRepository.validateMeasurements(
+        valid(current: null),
+        requireComplete: true,
+      ),
+      throwsStateError,
+    );
+  });
+}
