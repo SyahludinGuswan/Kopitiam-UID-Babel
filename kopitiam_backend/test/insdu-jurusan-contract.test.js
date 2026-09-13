@@ -31,7 +31,7 @@ test('Jurusan Terpakai cannot exceed Jurusan Terpasang', () => {
   assert.throws(() => api.validateInsduJurusan_({'Jurusan Terpasang': 2, 'Jurusan Terpakai': 3}), (error) => error.insduCode === 'INSDU_JURUSAN_RELATION_INVALID');
 });
 
-test('WBP and LWBP coordinates and capture times are required', () => {
+test('WBP and LWBP coordinates and canonical capture times are required', () => {
   const api = load();
   assert.doesNotThrow(() => api.validateInsduCoordinates_({
     'Koordinat Penginputan WBP': '-3.019482,106.454827',
@@ -43,6 +43,14 @@ test('WBP and LWBP coordinates and capture times are required', () => {
     'Koordinat Penginputan WBP': '', 'Waktu Penginputan WBP': '',
     'Koordinat Penginputan LWBP': '-3,106', 'Waktu Penginputan LWBP': 'now',
   }), (error) => error.insduCode === 'INSDU_COORDINATE_INVALID');
+});
+
+test('capture time rejects malformed and impossible dates', () => {
+  const api = load();
+  for (const value of ['2026-09-13T16:00:00', '13 Sep 2026, 16:00:00', '32 September 2026, 16:00:00', '29 Februari 2025, 16:00:00', '13 September 2026, 24:00:00']) {
+    assert.throws(() => api.insduCaptureTime_(value, 'Waktu Penginputan WBP'), (error) => error.insduCode === 'INSDU_CAPTURE_TIME_INVALID');
+  }
+  assert.equal(api.insduCaptureTime_('29 Februari 2024, 06:07:08', 'Waktu Penginputan WBP'), '29 Februari 2024, 06:07:08');
 });
 
 test('coordinate guard rejects malformed, out-of-range, and Null Island values', () => {

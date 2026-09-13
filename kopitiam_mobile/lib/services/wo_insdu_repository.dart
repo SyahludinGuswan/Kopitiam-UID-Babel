@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../models/wo_insdu.dart';
+import '../models/wo_insjar.dart';
 import 'api_service.dart';
 import 'sqlite_service.dart';
 
@@ -30,44 +31,31 @@ class WoInsduRepository {
     }
   }
 
-  static ({double latitude, double longitude}) _coordinate(
-    String value,
-    String label,
-  ) {
+  static ({double latitude, double longitude}) _coordinate(String value, String label) {
     final parts = value.trim().split(',');
-    if (parts.length != 2) {
-      throw StateError('$label wajib direkam melalui GPS aplikasi.');
-    }
+    if (parts.length != 2) throw StateError('$label wajib direkam melalui GPS aplikasi.');
     final latitude = double.tryParse(parts[0].trim());
     final longitude = double.tryParse(parts[1].trim());
-    if (latitude == null ||
-        longitude == null ||
-        !latitude.isFinite ||
-        !longitude.isFinite ||
-        latitude < -90 ||
-        latitude > 90 ||
-        longitude < -180 ||
-        longitude > 180 ||
-        (latitude == 0 && longitude == 0)) {
+    if (latitude == null || longitude == null || !latitude.isFinite || !longitude.isFinite || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || (latitude == 0 && longitude == 0)) {
       throw StateError('$label tidak valid. Ambil ulang melalui GPS aplikasi.');
     }
     return (latitude: latitude, longitude: longitude);
   }
 
+  static void _captureTime(String value, String label) {
+    final parsed = WoInsjar.parseStamp(value.trim());
+    if (parsed == null || WoInsjar.stampLengkap(parsed) != value.trim()) {
+      throw StateError('$label wajib memakai format dd MMMM yyyy, HH:mm:ss.');
+    }
+  }
+
   static void validateCoordinates(WoInsdu wo, {required bool requireComplete}) {
-    final empty = wo.koordinatPenginputanWbp.trim().isEmpty &&
-        wo.koordinatPenginputanLwbp.trim().isEmpty &&
-        wo.waktuPenginputanWbp.trim().isEmpty &&
-        wo.waktuPenginputanLwbp.trim().isEmpty;
+    final empty = wo.koordinatPenginputanWbp.trim().isEmpty && wo.koordinatPenginputanLwbp.trim().isEmpty && wo.waktuPenginputanWbp.trim().isEmpty && wo.waktuPenginputanLwbp.trim().isEmpty;
     if (!requireComplete && empty) return;
     _coordinate(wo.koordinatPenginputanWbp, 'Koordinat Penginputan WBP');
     _coordinate(wo.koordinatPenginputanLwbp, 'Koordinat Penginputan LWBP');
-    if (wo.waktuPenginputanWbp.trim().isEmpty) {
-      throw StateError('Waktu Penginputan WBP wajib tersedia.');
-    }
-    if (wo.waktuPenginputanLwbp.trim().isEmpty) {
-      throw StateError('Waktu Penginputan LWBP wajib tersedia.');
-    }
+    _captureTime(wo.waktuPenginputanWbp, 'Waktu Penginputan WBP');
+    _captureTime(wo.waktuPenginputanLwbp, 'Waktu Penginputan LWBP');
   }
 
   static void validateContract(WoInsdu wo, {required bool requireComplete}) {
@@ -79,10 +67,7 @@ class WoInsduRepository {
     final db = await _db.database;
     final info = await db.rawQuery('PRAGMA table_info($table)');
     final columns = info.map((row) => '${row['name']}').toSet();
-    for (final entry in const {
-      'waktu_penginputan_wbp': "TEXT NOT NULL DEFAULT ''",
-      'waktu_penginputan_lwbp': "TEXT NOT NULL DEFAULT ''",
-    }.entries) {
+    for (final entry in const {'waktu_penginputan_wbp': "TEXT NOT NULL DEFAULT ''", 'waktu_penginputan_lwbp': "TEXT NOT NULL DEFAULT ''"}.entries) {
       if (!columns.contains(entry.key)) await db.execute('ALTER TABLE $table ADD COLUMN ${entry.key} ${entry.value}');
     }
     return db;

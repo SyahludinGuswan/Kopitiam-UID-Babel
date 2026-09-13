@@ -34,15 +34,31 @@ function insduCoordinate_(value, label) {
   return { latitude: latitude, longitude: longitude };
 }
 
+function insduCaptureTime_(value, label) {
+  var text = String(value == null ? '' : value).trim();
+  var match = /^(\d{2})\s+(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s+(\d{4}),\s+(\d{2}):(\d{2}):(\d{2})$/.exec(text);
+  if (!match) {
+    insduContractError_('INSDU_CAPTURE_TIME_INVALID', label + ' wajib memakai format dd MMMM yyyy, HH:mm:ss.');
+  }
+  var months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  var day = Number(match[1]), month = months.indexOf(match[2]), year = Number(match[3]);
+  var hour = Number(match[4]), minute = Number(match[5]), second = Number(match[6]);
+  var parsed = new Date(Date.UTC(year, month, day, hour, minute, second));
+  if (month < 0 || year < 2000 || year > 2100 || hour > 23 || minute > 59 || second > 59 ||
+      parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month || parsed.getUTCDate() !== day ||
+      parsed.getUTCHours() !== hour || parsed.getUTCMinutes() !== minute || parsed.getUTCSeconds() !== second) {
+    insduContractError_('INSDU_CAPTURE_TIME_INVALID', label + ' bukan tanggal dan waktu yang valid.');
+  }
+  return text;
+}
+
 function insduCapture_(incoming, suffix) {
   var coordinateKey = 'Koordinat Penginputan ' + suffix;
   var timeKey = 'Waktu Penginputan ' + suffix;
-  var coordinate = insduCoordinate_(incoming[coordinateKey], coordinateKey);
-  var capturedAt = String(incoming[timeKey] == null ? '' : incoming[timeKey]).trim();
-  if (!capturedAt || capturedAt.length > 80) {
-    insduContractError_('INSDU_CAPTURE_TIME_INVALID', timeKey + ' wajib diisi.');
-  }
-  return { coordinate: coordinate, capturedAt: capturedAt };
+  return {
+    coordinate: insduCoordinate_(incoming[coordinateKey], coordinateKey),
+    capturedAt: insduCaptureTime_(incoming[timeKey], timeKey)
+  };
 }
 
 function validateInsduCoordinates_(incoming) {
