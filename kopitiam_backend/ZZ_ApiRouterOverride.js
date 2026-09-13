@@ -14,17 +14,14 @@ function doPost(e) {
     if (action === 'getMasterData') return json_(getMasterData_(body.token));
     if (action === 'getMasterGardu') return json_(getMasterGardu_(body.token));
     if (action === 'getWoInsjar') return json_(getWoInsjar_(body.token));
-    if (action === 'syncWoInsjar') return json_(syncWoCoreVerified_(body.token, 'insjar', CONFIG.WO_INSJAR_SHEET, body.rows));
+    if (action === 'syncWoInsjar') return json_(syncWoCoreCommitted_(body.token, 'insjar', CONFIG.WO_INSJAR_SHEET, body.rows));
     if (action === 'getWoInsdu') return json_(getWoInsdu_(body.token));
-    if (action === 'syncWoInsdu') return json_(syncWoCoreVerified_(body.token, 'insdu', CONFIG.WO_INSDU_SHEET || 'WO_Ins_Du', body.rows));
+    if (action === 'syncWoInsdu') return json_(syncWoCoreCommitted_(body.token, 'insdu', CONFIG.WO_INSDU_SHEET || 'WO_Ins_Du', body.rows));
     if (action === 'getWoRow') return json_(getWoRow_(body.token));
-    if (action === 'syncWoRow') return json_(syncWoCoreVerified_(body.token, 'row', CONFIG.WO_ROW_SHEET, body.rows));
+    if (action === 'syncWoRow') return json_(syncWoCoreCommitted_(body.token, 'row', CONFIG.WO_ROW_SHEET, body.rows));
     if (action === 'getWoHarJar') return json_(getHarExecution_(body.token, 'jar'));
     if (action === 'getWoHarDu') return json_(getHarExecution_(body.token, 'du'));
-    if (action === 'syncWoHarJar' || action === 'syncWoHarDu') {
-      var mode = action === 'syncWoHarJar' ? 'jar' : 'du';
-      return json_(syncHarVerified_(body.token, mode, body.rows));
-    }
+    if (action === 'syncWoHarJar' || action === 'syncWoHarDu') return json_(syncHarCommitted_(body.token, action === 'syncWoHarJar' ? 'jar' : 'du', body.rows));
     if (action === 'getTemuanInspeksi') return json_(getTemuanInspeksi_(body.token, body.kodeWo));
     if (action === 'syncTemuanInspeksi') return json_(syncTemuanInspeksiIdempotent_(body.token, body.row));
     return json_(fail_('ACTION_INVALID', 'Action API tidak dikenal.'));
