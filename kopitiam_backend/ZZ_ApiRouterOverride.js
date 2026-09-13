@@ -24,7 +24,7 @@ function doPost(e) {
     if (action === 'syncWoHarJar' || action === 'syncWoHarDu') {
       var mode = action === 'syncWoHarJar' ? 'jar' : 'du';
       if (Array.isArray(body.rows) && body.rows.length && body.rows[0].schemaVersion === 2) return json_(syncHarExecution_(body.token, mode, body.rows));
-      return json_(mode === 'jar' ? syncWoHarJar_(body.token, body.rows) : syncWoHarDu_(body.token, body.rows));
+      return json_(syncHarLegacySecure_(body.token, mode, body.rows));
     }
     if (action === 'getTemuanInspeksi') return json_(getTemuanInspeksi_(body.token, body.kodeWo));
     if (action === 'syncTemuanInspeksi') return json_(syncTemuanInspeksiIdempotent_(body.token, body.row));
