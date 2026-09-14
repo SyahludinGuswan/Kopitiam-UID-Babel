@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:http/http.dart' as http;
 
 import 'api_activity.dart';
+import 'api_backoff.dart';
 import 'device_session_service.dart';
 
 class ApiService {
@@ -14,6 +16,7 @@ class ApiService {
   static const _redirectCodes = {301, 302, 303, 307, 308};
   static const _appsScriptHost = 'script.google.com';
   static const _contentHost = 'script.googleusercontent.com';
+  static final _jitter = Random.secure();
 
   static Duration _timeoutFor(Map<String, dynamic> payload) {
     final action = '${payload['action'] ?? ''}';
@@ -73,7 +76,20 @@ class ApiService {
 
   static Future<Map<String, dynamic>> _postMap(Map<String, dynamic> payload) {
     final action = '${payload['action'] ?? ''}';
-    return ApiActivity.track(action, () async => _decode(await _postAppsScript(payload)));
+    return ApiActivity.track(action, () async {
+      var retryCount = 0;
+      while (true) {
+        final response = _decode(await _postAppsScript(payload));
+        if (!ApiBackoff.shouldRetry(response, retryCount)) return response;
+        final delay = ApiBackoff.delayFor(
+          retryCount: retryCount,
+          retryAfterSeconds: response['retryAfterSeconds'],
+          jitterMilliseconds: _jitter.nextInt(1001),
+        );
+        retryCount++;
+        await Future<void>.delayed(delay);
+      }
+    });
   }
 
   static Future<Map<String, dynamic>> loginPerangkat(String username, String password) async {

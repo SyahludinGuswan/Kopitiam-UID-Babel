@@ -1,4 +1,13 @@
 /* Workspace-wide quota guard. Uses the current per-action limits as requested. */
+function globalQuotaBusy_(message, retryAfterSeconds) {
+  return {
+    success: false,
+    kode: 'SERVER_BUSY',
+    message: message,
+    retryAfterSeconds: Math.max(1, Number(retryAfterSeconds || 1)),
+  };
+}
+
 function consumeGlobalActionQuota_(action, now) {
   action = String(action || '').trim();
   var policy = ACTION_LIMITS_[action];
@@ -7,6 +16,10 @@ function consumeGlobalActionQuota_(action, now) {
   now = Number(now || Date.now());
   var windowMs = policy.seconds * 1000;
   var windowId = Math.floor(now / windowMs);
+  var resetAfterSeconds = Math.max(
+    1,
+    Math.ceil(((windowId + 1) * windowMs - now) / 1000),
+  );
   var key = 'global_quota_' + action + '_' + windowId;
   var lock = LockService.getScriptLock();
   var locked = false;
@@ -17,27 +30,24 @@ function consumeGlobalActionQuota_(action, now) {
     var count = Number(cache.get(key) || 0) + 1;
     cache.put(key, String(count), policy.seconds + 5);
     if (count > policy.limit) {
-      return fail_(
-        'SERVER_BUSY',
-        'Server sedang menerima terlalu banyak permintaan. Data lokal tetap aman; coba lagi sebentar.',
+      return globalQuotaBusy_(
+        'Server sedang menerima terlalu banyak permintaan. Data lokal tetap aman; sistem akan mencoba lagi.',
+        resetAfterSeconds,
       );
     }
     return {
       success: true,
       remaining: Math.max(0, policy.limit - count),
-      resetAfterSeconds: Math.max(
-        1,
-        Math.ceil(((windowId + 1) * windowMs - now) / 1000),
-      ),
+      resetAfterSeconds: resetAfterSeconds,
     };
   } catch (error) {
     console.error(
       'Global quota gagal:',
       error && error.stack ? error.stack : error,
     );
-    return fail_(
-      'SERVER_BUSY',
-      'Server sedang sibuk. Data lokal tetap aman; coba lagi sebentar.',
+    return globalQuotaBusy_(
+      'Server sedang sibuk. Data lokal tetap aman; sistem akan mencoba lagi.',
+      3,
     );
   } finally {
     if (locked) lock.releaseLock();
