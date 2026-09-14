@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'api_activity.dart';
 import 'api_backoff.dart';
 import 'device_session_service.dart';
+import 'sync_request_coordinator.dart';
 
 class ApiService {
   static const String baseUrl = String.fromEnvironment(
@@ -17,6 +18,7 @@ class ApiService {
   static const _appsScriptHost = 'script.google.com';
   static const _contentHost = 'script.googleusercontent.com';
   static final _jitter = Random.secure();
+  static final _syncCoordinator = SyncRequestCoordinator();
 
   static Duration _timeoutFor(Map<String, dynamic> payload) {
     final action = '${payload['action'] ?? ''}';
@@ -74,21 +76,28 @@ class ApiService {
     throw StateError('Format respons API tidak valid.');
   }
 
+  static Future<Map<String, dynamic>> _sendWithBackoff(Map<String, dynamic> payload) async {
+    var retryCount = 0;
+    while (true) {
+      final response = _decode(await _postAppsScript(payload));
+      if (!ApiBackoff.shouldRetry(response, retryCount)) return response;
+      final delay = ApiBackoff.delayFor(
+        retryCount: retryCount,
+        retryAfterSeconds: response['retryAfterSeconds'],
+        jitterMilliseconds: _jitter.nextInt(1001),
+      );
+      retryCount++;
+      await Future<void>.delayed(delay);
+    }
+  }
+
   static Future<Map<String, dynamic>> _postMap(Map<String, dynamic> payload) {
     final action = '${payload['action'] ?? ''}';
-    return ApiActivity.track(action, () async {
-      var retryCount = 0;
-      while (true) {
-        final response = _decode(await _postAppsScript(payload));
-        if (!ApiBackoff.shouldRetry(response, retryCount)) return response;
-        final delay = ApiBackoff.delayFor(
-          retryCount: retryCount,
-          retryAfterSeconds: response['retryAfterSeconds'],
-          jitterMilliseconds: _jitter.nextInt(1001),
-        );
-        retryCount++;
-        await Future<void>.delayed(delay);
+    return ApiActivity.track(action, () {
+      if (action.startsWith('sync')) {
+        return _syncCoordinator.run(() => _sendWithBackoff(payload));
       }
+      return _sendWithBackoff(payload);
     });
   }
 
