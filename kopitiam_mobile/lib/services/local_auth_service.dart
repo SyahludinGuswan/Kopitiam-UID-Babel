@@ -5,7 +5,8 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Kredensial offline hanya berlaku 24 jam sejak login online terakhir.
+/// Kredensial offline hanya berlaku 24 jam sejak login online terakhir dan
+/// hanya untuk akun yang sama. Akun berbeda wajib diverifikasi online.
 class LocalAuthService {
   static const _storage = FlutterSecureStorage();
   static const _usernameKey = 'local_auth_username';
@@ -15,15 +16,30 @@ class LocalAuthService {
   static const _verifiedAtKey = 'local_auth_verified_at';
   static const offlineValidity = Duration(days: 1);
 
+  static String normalizeUsername(Object? value) =>
+      '${value ?? ''}'.trim().toLowerCase();
+
+  static bool sameOfflineAccount(String requested, String saved) =>
+      normalizeUsername(requested).isNotEmpty &&
+      normalizeUsername(requested) == normalizeUsername(saved);
+
+  static Future<String> offlineOwner() async =>
+      normalizeUsername(await _storage.read(key: _usernameKey));
+
   static Future<void> saveAfterOnlineLogin({
     required String username,
     required String password,
     required Map<String, dynamic> profile,
   }) async {
+    final requested = normalizeUsername(username);
+    final verified = normalizeUsername(profile['username']);
+    if (requested.isEmpty || verified.isEmpty || requested != verified) {
+      throw StateError('Identitas akun hasil verifikasi server tidak cocok.');
+    }
     final salt = _randomSalt();
     final hash = _hash(password, salt);
     final verifiedAt = DateTime.now().toUtc();
-    await _storage.write(key: _usernameKey, value: username.trim().toLowerCase());
+    await _storage.write(key: _usernameKey, value: verified);
     await _storage.write(key: _hashKey, value: hash);
     await _storage.write(key: _saltKey, value: salt);
     await _storage.write(key: _sessionKey, value: jsonEncode(profile));
@@ -41,6 +57,10 @@ class LocalAuthService {
     required String password,
   }) async {
     final savedUsername = await _storage.read(key: _usernameKey);
+    if (savedUsername == null ||
+        !sameOfflineAccount(username, savedUsername)) {
+      return null;
+    }
     final savedHash = await _storage.read(key: _hashKey);
     final salt = await _storage.read(key: _saltKey);
     final sessionRaw = await _storage.read(key: _sessionKey);
@@ -48,8 +68,7 @@ class LocalAuthService {
     final verifiedAt = DateTime.tryParse(verifiedAtRaw ?? '')?.toUtc();
     final now = DateTime.now().toUtc();
 
-    if (savedUsername == null ||
-        savedHash == null ||
+    if (savedHash == null ||
         salt == null ||
         sessionRaw == null ||
         verifiedAt == null ||
@@ -58,13 +77,14 @@ class LocalAuthService {
       await clear();
       return null;
     }
-    if (savedUsername != username.trim().toLowerCase()) return null;
     if (_hash(password, salt) != savedHash) return null;
     try {
       final decoded = jsonDecode(sessionRaw);
-      if (decoded is Map) {
+      if (decoded is Map &&
+          sameOfflineAccount(username, '${decoded['username'] ?? ''}')) {
         final expiresAt = verifiedAt.add(offlineValidity).toIso8601String();
         final session = Map<String, dynamic>.from(decoded)
+          ..['roleVerifiedOnline'] = false
           ..['offlineLogin'] = true
           ..['offlineExpiresAt'] = expiresAt;
         final prefs = await SharedPreferences.getInstance();

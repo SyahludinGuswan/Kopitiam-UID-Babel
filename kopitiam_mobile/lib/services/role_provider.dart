@@ -29,7 +29,8 @@ class RoleProfile {
         offline && expiry != null && DateTime.now().toUtc().isBefore(expiry);
     final online =
         !offline &&
-        session['roleVerifiedOnline'] != false &&
+        session['roleVerifiedOnline'] == true &&
+        '${session['username'] ?? ''}'.trim().isNotEmpty &&
         '${session['role'] ?? ''}'.trim().isNotEmpty;
     return RoleProfile(
       kodeUiw: '${session['kodeUiw'] ?? ''}'.trim(),
@@ -57,9 +58,6 @@ class RoleProfile {
   };
 }
 
-/// Penyedia role yang selalu berangkat dari profil sesi, bukan input form.
-/// Profil sesi online berasal dari User_App_Mobile; profil offline hanya
-/// memakai salinan yang disimpan setelah verifikasi online terakhir.
 class RoleProvider {
   final RoleProfile profile;
 
@@ -108,8 +106,6 @@ class RoleProvider {
     return result;
   }
 
-  /// Meminta ulang profil dari pusat dan hanya menyalin field identitas yang
-  /// memang dikeluarkan endpoint. Token dan hak akses tidak berasal dari input.
   static Future<Map<String, dynamic>> verifyOnline(
     Map<String, dynamic> session,
   ) async {
@@ -131,6 +127,10 @@ class RoleProvider {
       'ulp',
       'username',
       'role',
+      'bidang',
+      'tim',
+      'subTim',
+      'aksesMenu',
     ]) {
       if (profile.containsKey(key)) {
         result[key] = profile[key];

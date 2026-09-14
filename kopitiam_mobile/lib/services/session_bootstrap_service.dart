@@ -43,8 +43,11 @@ class SessionBootstrapService {
     } catch (_) {
       final cached = await DeviceSessionService.profile();
       final verifiedAt = await DeviceSessionService.verifiedAt();
+      final owner = await DeviceSessionService.verifiedUsername();
       final now = DateTime.now().toUtc();
       if (cached == null ||
+          owner.isEmpty ||
+          DeviceSessionService.normalizeUsername(cached['username']) != owner ||
           verifiedAt == null ||
           now.isBefore(verifiedAt) ||
           now.difference(verifiedAt) >= const Duration(days: 1)) {
