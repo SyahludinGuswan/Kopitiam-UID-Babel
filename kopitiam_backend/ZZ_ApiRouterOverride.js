@@ -3,6 +3,10 @@ function doPost(e) {
   try {
     var body = parseBody_(e);
     var action = String(body.action || '').trim();
+
+    var globalQuota = consumeGlobalActionQuota_(action);
+    if (!globalQuota.success) return json_(globalQuota);
+
     var quota = consumeActionQuota_(action, runtimeIdentity_(body));
     if (!quota.success) return json_(quota);
     if (action === 'login' || action === 'loginPerangkat') return json_(loginPerangkat_(body.username, body.password, body.perangkat));
