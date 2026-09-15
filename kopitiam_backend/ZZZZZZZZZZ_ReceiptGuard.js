@@ -20,88 +20,62 @@ function receiptConfigureTransport_() {
 
 function receiptCanonical_(value) {
   if (value === null || value === undefined) return '';
-  if (typeof value === 'number') {
-    return isFinite(value) ? String(value) : '__invalid_number__';
-  }
+  if (typeof value === 'number') return isFinite(value) ? String(value) : '__invalid_number__';
   if (typeof value === 'boolean') return value ? 'true' : 'false';
-  if (Array.isArray(value)) {
-    return '[' + value.map(receiptCanonical_).join(',') + ']';
-  }
+  if (Array.isArray(value)) return '[' + value.map(receiptCanonical_).join(',') + ']';
   if (typeof value === 'object') {
     var objectKeys = Object.keys(value).map(normalize_).sort();
     return '{' + objectKeys.map(function (key) {
-      var original = Object.keys(value).filter(function (candidate) {
-        return normalize_(candidate) === key;
-      })[0];
+      var original = Object.keys(value).filter(function (candidate) { return normalize_(candidate) === key; })[0];
       return key + ':' + receiptCanonical_(value[original]);
     }).join(',') + '}';
   }
   var text = String(value).trim().replace(/\s+/g, ' ');
   var number = Number(text.replace(',', '.'));
-  if (/^-?\d+(?:[.,]\d+)?$/.test(text) && isFinite(number)) {
-    return String(number);
-  }
+  if (/^-?\d+(?:[.,]\d+)?$/.test(text) && isFinite(number)) return String(number);
   return text.toLowerCase();
 }
 
 function receiptPayloadDigest_(row) {
-  var keys = Object.keys(row).map(normalize_).filter(function (key) {
-    return !RECEIPT_EXCLUDED_KEYS_[key];
-  }).sort();
+  var keys = Object.keys(row).map(normalize_).filter(function (key) { return !RECEIPT_EXCLUDED_KEYS_[key]; }).sort();
   return sha256_(keys.map(function (key) {
-    var original = Object.keys(row).filter(function (candidate) {
-      return normalize_(candidate) === key;
-    })[0];
+    var original = Object.keys(row).filter(function (candidate) { return normalize_(candidate) === key; })[0];
     return key + '=' + receiptCanonical_(row[original]);
   }).join('\n'));
 }
 
 function receiptValidateRows_(rows) {
-  if (!Array.isArray(rows) || !rows.length) {
-    throw new Error('Data WO wajib diisi.');
-  }
+  if (!Array.isArray(rows) || !rows.length) throw new Error('Data WO wajib diisi.');
   return rows.map(function (row) {
     var copy = {};
     Object.keys(row || {}).forEach(function (key) { copy[key] = row[key]; });
     var supplied = String(copy.clientPayloadDigest || '').trim().toLowerCase();
-    if (!/^[a-f0-9]{64}$/.test(supplied)) {
-      woCommitFail_('SYNC_RECEIPT_REQUIRED', 'Digest snapshot final wajib tersedia.');
-    }
-    if (receiptPayloadDigest_(copy) !== supplied) {
-      woCommitFail_('SYNC_RECEIPT_MISMATCH', 'Digest snapshot final tidak cocok.');
-    }
+    if (!/^[a-f0-9]{64}$/.test(supplied)) woCommitFail_('SYNC_RECEIPT_REQUIRED', 'Digest snapshot final wajib tersedia.');
+    if (receiptPayloadDigest_(copy) !== supplied) woCommitFail_('SYNC_RECEIPT_MISMATCH', 'Digest snapshot final tidak cocok.');
     return copy;
   });
 }
 
 function receiptFinalize_(result, rows, photoRequired) {
-  if (!result || result.success !== true || !Array.isArray(result.receipts)) {
-    return result;
-  }
-  if (result.receipts.length !== rows.length) {
-    return fail_('SYNC_RECEIPT_INCOMPLETE', 'Receipt server tidak lengkap.');
-  }
+  if (!result || result.success !== true || !Array.isArray(result.receipts)) return result;
+  if (result.receipts.length !== rows.length) return fail_('SYNC_RECEIPT_INCOMPLETE', 'Receipt server tidak lengkap.');
   for (var i = 0; i < rows.length; i++) {
     var row = rows[i];
     var code = String(row['Kode WO'] || '').trim();
     var matches = result.receipts.filter(function (receipt) {
-      return receipt && receipt.committed === true &&
-        String(receipt.kodeWo || '').trim() === code;
+      return receipt && receipt.committed === true && String(receipt.kodeWo || '').trim() === code;
     });
-    if (matches.length !== 1) {
-      return fail_('SYNC_RECEIPT_INCOMPLETE', 'Receipt WO tidak unik atau tidak ditemukan.');
-    }
+    if (matches.length !== 1) return fail_('SYNC_RECEIPT_INCOMPLETE', 'Receipt WO tidak unik atau tidak ditemukan.');
     var receipt = matches[0];
-    receipt.payloadDigest = String(row.clientPayloadDigest).toLowerCase();
-    var clientPhoto = String(row.clientPhotoDigest || '').trim().toLowerCase();
-    if (photoRequired && !clientPhoto) {
-      return fail_('SYNC_PHOTO_RECEIPT_REQUIRED', 'Digest foto wajib tersedia.');
+    var clientDigest = String(row.clientPayloadDigest || '').trim().toLowerCase();
+    var serverDigest = String(receipt.payloadDigest || '').trim().toLowerCase();
+    if (!/^[a-f0-9]{64}$/.test(serverDigest) || serverDigest !== clientDigest) {
+      return fail_('SYNC_RECEIPT_MISMATCH', 'Digest receipt server tidak cocok dengan snapshot final.');
     }
-    if (clientPhoto) {
-      if (!receipt.photo || !receipt.photo.fileId ||
-          String(receipt.photo.digest || '').toLowerCase() !== clientPhoto) {
-        return fail_('SYNC_PHOTO_RECEIPT_MISMATCH', 'Receipt foto tidak cocok.');
-      }
+    var clientPhoto = String(row.clientPhotoDigest || '').trim().toLowerCase();
+    if (photoRequired && !clientPhoto) return fail_('SYNC_PHOTO_RECEIPT_REQUIRED', 'Digest foto wajib tersedia.');
+    if (clientPhoto && (!receipt.photo || !receipt.photo.fileId || String(receipt.photo.digest || '').toLowerCase() !== clientPhoto)) {
+      return fail_('SYNC_PHOTO_RECEIPT_MISMATCH', 'Receipt foto tidak cocok.');
     }
   }
   return result;
@@ -110,11 +84,8 @@ function receiptFinalize_(result, rows, photoRequired) {
 function syncWoNoPhotoReceipt_(token, mode, sheetName, rows) {
   receiptConfigureTransport_();
   var validated;
-  try {
-    validated = receiptValidateRows_(rows);
-  } catch (error) {
-    return fail_(error.woCommitCode || 'SYNC_RECEIPT_INVALID', error.message);
-  }
+  try { validated = receiptValidateRows_(rows); }
+  catch (error) { return fail_(error.woCommitCode || 'SYNC_RECEIPT_INVALID', error.message); }
   var auth = cekSesi_(token);
   if (!auth.success) return auth;
   var access = woCoreAccess_(auth.sesi, mode);
@@ -134,30 +105,29 @@ function syncWoNoPhotoReceipt_(token, mode, sheetName, rows) {
       var status = expected['status wo'];
       delete expected['status wo'];
       Object.keys(expected).forEach(function (key) {
-        if (WO_CORE_MUTABLE[mode].indexOf(key) >= 0) {
-          sheet.getRange(item.rowIndex + 1, targets.index[key] + 1)
-            .setValue(safeCell_(expected[key]));
-        }
+        if (WO_CORE_MUTABLE[mode].indexOf(key) >= 0) sheet.getRange(item.rowIndex + 1, targets.index[key] + 1).setValue(safeCell_(expected[key]));
       });
       SpreadsheetApp.flush();
       woCommitVerifyRow_(sheet, item.rowIndex + 1, headers, expected);
       if (status !== undefined) {
-        sheet.getRange(item.rowIndex + 1, targets.index['status wo'] + 1)
-          .setValue(safeCell_(status));
+        sheet.getRange(item.rowIndex + 1, targets.index['status wo'] + 1).setValue(safeCell_(status));
         SpreadsheetApp.flush();
         expected['status wo'] = status;
         woCommitVerifyRow_(sheet, item.rowIndex + 1, headers, expected);
       }
+      var suppliedDigest = String(item.incoming.clientPayloadDigest || '').trim().toLowerCase();
+      var verifiedDigest = receiptPayloadDigest_(item.normalized);
+      if (verifiedDigest !== suppliedDigest) woCommitFail_('SYNC_RECEIPT_MISMATCH', 'Digest hasil verifikasi server tidak cocok.');
       receipts.push({
         kodeWo: item.code,
         ulp: String(woVerifiedValue_(item.normalized, ['ULP']) || '').trim(),
         tanggal: String(woVerifiedValue_(item.normalized, ['Tanggal Pekerjaan', 'Tanggal']) || '').trim(),
-        payloadDigest: String(item.incoming.clientPayloadDigest).toLowerCase(),
+        payloadDigest: verifiedDigest,
         photo: null,
         committed: true
       });
     }
-    return {success: true, accepted: receipts.map(function (r) { return r.kodeWo; }), receipts: receipts, diproses: receipts.length};
+    return {success: true, accepted: receipts.map(function (receipt) { return receipt.kodeWo; }), receipts: receipts, diproses: receipts.length};
   } catch (error) {
     return fail_(error.woCommitCode || error.woCode || 'WO_COMMIT_FAILED', error.message);
   } finally {
@@ -192,8 +162,7 @@ function syncWoPhotoReceipt_(token, mode, sheetName, rows) {
   var validated;
   try { validated = receiptValidateRows_(rows); }
   catch (error) { return fail_(error.woCommitCode || 'SYNC_RECEIPT_INVALID', error.message); }
-  var result = syncWoCoreCommitted_(token, mode, sheetName, validated);
-  return receiptFinalize_(result, validated, true);
+  return receiptFinalize_(syncWoCoreCommitted_(token, mode, sheetName, validated), validated, true);
 }
 
 function syncHarReceipt_(token, mode, rows) {
@@ -201,6 +170,5 @@ function syncHarReceipt_(token, mode, rows) {
   var validated;
   try { validated = receiptValidateRows_(rows); }
   catch (error) { return fail_(error.woCommitCode || 'SYNC_RECEIPT_INVALID', error.message); }
-  var result = syncHarCommitted_(token, mode, validated);
-  return receiptFinalize_(result, validated, true);
+  return receiptFinalize_(syncHarCommitted_(token, mode, validated), validated, true);
 }
