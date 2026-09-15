@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'api_activity.dart';
 import 'api_backoff.dart';
 import 'device_session_service.dart';
+import 'sync_receipt.dart';
 import 'sync_request_coordinator.dart';
 
 class ApiService {
@@ -101,6 +102,28 @@ class ApiService {
     });
   }
 
+  static Future<Map<String, dynamic>> _syncRows(
+    String action,
+    String token,
+    List<Map<String, dynamic>> sourceRows,
+  ) async {
+    final rows = SyncReceiptGuard.prepare(sourceRows);
+    final response = await _postMap({
+      'action': action,
+      'token': token,
+      'rows': rows,
+    });
+    if (!SyncReceiptGuard.verify(response, rows)) {
+      return {
+        'success': false,
+        'kode': 'SYNC_RECEIPT_INVALID',
+        'message': 'Konfirmasi server tidak cocok dengan snapshot final. Data lokal dipertahankan.',
+        'diproses': 0,
+      };
+    }
+    return response;
+  }
+
   static Future<Map<String, dynamic>> loginPerangkat(String username, String password) async {
     final device = await DeviceSessionService.deviceName();
     final response = await _postMap({'action': 'loginPerangkat', 'username': username, 'password': password, 'perangkat': device});
@@ -123,16 +146,16 @@ class ApiService {
   static Future<Map<String, dynamic>> getMasterGardu(String token) => _postMap({'action': 'getMasterGardu', 'token': token});
   static Future<Map<String, dynamic>> getWoInsjar(String token) => _postMap({'action': 'getWoInsjar', 'token': token});
   static Future<Map<String, dynamic>> getTemuan(String token, String kodeWo) => _postMap({'action': 'getTemuanInspeksi', 'token': token, 'kodeWo': kodeWo});
-  static Future<Map<String, dynamic>> syncWoInsjar(String token, List<Map<String, dynamic>> rows) => _postMap({'action': 'syncWoInsjar', 'token': token, 'rows': rows});
+  static Future<Map<String, dynamic>> syncWoInsjar(String token, List<Map<String, dynamic>> rows) => _syncRows('syncWoInsjar', token, rows);
   static Future<Map<String, dynamic>> syncTemuan(String token, Map<String, dynamic> row) => _postMap({'action': 'syncTemuanInspeksi', 'token': token, 'row': row});
   static Future<Map<String, dynamic>> getWoRow(String token) => _postMap({'action': 'getWoRow', 'token': token});
-  static Future<Map<String, dynamic>> syncWoRow(String token, List<Map<String, dynamic>> rows) => _postMap({'action': 'syncWoRow', 'token': token, 'rows': rows});
+  static Future<Map<String, dynamic>> syncWoRow(String token, List<Map<String, dynamic>> rows) => _syncRows('syncWoRow', token, rows);
   static Future<Map<String, dynamic>> getWoHarJar(String token) => _postMap({'action': 'getWoHarJar', 'token': token});
-  static Future<Map<String, dynamic>> syncWoHarJar(String token, List<Map<String, dynamic>> rows) => _postMap({'action': 'syncWoHarJar', 'token': token, 'rows': rows});
+  static Future<Map<String, dynamic>> syncWoHarJar(String token, List<Map<String, dynamic>> rows) => _syncRows('syncWoHarJar', token, rows);
   static Future<Map<String, dynamic>> getWoHarDu(String token) => _postMap({'action': 'getWoHarDu', 'token': token});
-  static Future<Map<String, dynamic>> syncWoHarDu(String token, List<Map<String, dynamic>> rows) => _postMap({'action': 'syncWoHarDu', 'token': token, 'rows': rows});
+  static Future<Map<String, dynamic>> syncWoHarDu(String token, List<Map<String, dynamic>> rows) => _syncRows('syncWoHarDu', token, rows);
   static Future<Map<String, dynamic>> getWoInsdu(String token) => _postMap({'action': 'getWoInsdu', 'token': token});
-  static Future<Map<String, dynamic>> syncWoInsdu(String token, List<Map<String, dynamic>> rows) => _postMap({'action': 'syncWoInsdu', 'token': token, 'rows': rows});
+  static Future<Map<String, dynamic>> syncWoInsdu(String token, List<Map<String, dynamic>> rows) => _syncRows('syncWoInsdu', token, rows);
 
   static Future<Map<String, dynamic>> logoutPerangkat({String token = ''}) async {
     final device = await DeviceSessionService.token();
