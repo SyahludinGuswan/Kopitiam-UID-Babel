@@ -1,0 +1,6 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const source=fs.readFileSync(path.join(__dirname,'../ZZZZZZZZZZ_ReceiptGuard.js'),'utf8');
+function load(){const sandbox={normalize_:v=>String(v??'').trim().toLowerCase().replace(/\s+/g,' '),fail_:(kode,message)=>({success:false,kode,message}),WO_COMMIT_TRANSPORT_KEYS_:{}};vm.createContext(sandbox);vm.runInContext(source,sandbox);return sandbox;}
+test('matching server and client digest is accepted without mutation',()=>{const api=load(),digest='a'.repeat(64),rows=[{'Kode WO':'WO-1',clientPayloadDigest:digest}],result={success:true,receipts:[{committed:true,kodeWo:'WO-1',payloadDigest:digest,photo:null}]};const output=api.receiptFinalize_(result,rows,false);assert.equal(output.success,true);assert.equal(output.receipts[0].payloadDigest,digest);});
+test('server receipt digest mismatch fails closed',()=>{const api=load(),rows=[{'Kode WO':'WO-1',clientPayloadDigest:'a'.repeat(64)}],result={success:true,receipts:[{committed:true,kodeWo:'WO-1',payloadDigest:'b'.repeat(64),photo:null}]};const output=api.receiptFinalize_(result,rows,false);assert.equal(output.success,false);assert.equal(output.kode,'SYNC_RECEIPT_MISMATCH');assert.equal(result.receipts[0].payloadDigest,'b'.repeat(64));});
