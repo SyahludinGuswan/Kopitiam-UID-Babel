@@ -78,11 +78,16 @@ function woCommitPreparePhoto_(normalized, folderPathValue, code) {
 }
 
 function woCommitReceipt_(item, expected, photo) {
+  var suppliedDigest = String(item.normalized.clientpayloaddigest || '').trim().toLowerCase();
+  var verifiedDigest = receiptPayloadDigest_(item.normalized);
+  if (!/^[a-f0-9]{64}$/.test(suppliedDigest) || suppliedDigest !== verifiedDigest) {
+    woCommitFail_('SYNC_RECEIPT_MISMATCH', 'Digest receipt tidak cocok dengan data yang sudah diverifikasi.');
+  }
   return {
     kodeWo: item.code,
     ulp: String(woVerifiedValue_(item.normalized, ['ULP']) || '').trim(),
     tanggal: String(woVerifiedValue_(item.normalized, ['Tanggal Pekerjaan', 'Tanggal']) || '').trim(),
-    payloadDigest: woCommitDigest_(expected),
+    payloadDigest: verifiedDigest,
     photo: photo ? photo.receipt : null,
     committed: true
   };
