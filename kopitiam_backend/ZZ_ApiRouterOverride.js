@@ -7,8 +7,8 @@ function doPost(e) {
     var globalQuota = consumeGlobalActionQuota_(action);
     if (!globalQuota.success) return json_(globalQuota);
 
-    var quota = consumeActionQuota_(action, runtimeIdentity_(body));
-    if (!quota.success) return json_(quota);
+    var preAuthQuota = consumePreAuthQuota_(action, body);
+    if (!preAuthQuota.success) return json_(preAuthQuota);
     if (action === 'login' || action === 'loginPerangkat') return json_(loginPerangkat_(body.username, body.password, body.perangkat));
     if (action === 'cekPerangkat') return json_(cekPerangkat_(body.deviceToken));
     if (action === 'logoutPerangkat') return json_(logoutPerangkat_(body.deviceToken, body.token));
@@ -16,6 +16,8 @@ function doPost(e) {
 
     var live = requireLiveAuthorization_(action, body.token);
     if (!live.success) return json_(live);
+    var accountQuota = consumeLiveAccountQuota_(action, live.sesi);
+    if (!accountQuota.success) return json_(accountQuota);
 
     if (action === 'getRoleProfile' || action === 'getProfilPeran') return json_(getRoleProfile_(body.token));
     if (action === 'cekSesi') return json_(cekSesi_(body.token));
