@@ -27,7 +27,7 @@ function doPost(e) {
     if (action === 'syncWoRow') return json_(syncWoPhotoReceipt_(body.token, 'row', CONFIG.WO_ROW_SHEET, body.rows));
     if (action === 'getWoHarJar') return json_(getHarExecution_(body.token, 'jar'));
     if (action === 'getWoHarDu') return json_(getHarExecution_(body.token, 'du'));
-    if (action === 'syncWoHarJar' || action === 'syncWoHarDu') return json_(syncHarReceipt_(body.token, action === 'syncWoHarJar' ? 'jar' : 'du', body.rows));
+    if (action === 'syncWoHarJar' || action === 'syncWoHarDu') return json_(syncHarReceiptByStatus_(body.token, action === 'syncWoHarJar' ? 'jar' : 'du', body.rows));
     if (action === 'getTemuanInspeksi') return json_(getTemuanInspeksi_(body.token, body.kodeWo));
     if (action === 'syncTemuanInspeksi') return json_(syncTemuanInspeksiIdempotent_(body.token, body.row));
     return json_(fail_('ACTION_INVALID', 'Action API tidak dikenal.'));
