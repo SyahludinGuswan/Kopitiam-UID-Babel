@@ -29,7 +29,7 @@ function doPost(e) {
     if (action === 'getWoHarDu') return json_(getHarExecution_(body.token, 'du'));
     if (action === 'syncWoHarJar' || action === 'syncWoHarDu') return json_(syncHarWithEvidenceGuard_(body.token, action === 'syncWoHarJar' ? 'jar' : 'du', body.rows));
     if (action === 'getTemuanInspeksi') return json_(getTemuanInspeksi_(body.token, body.kodeWo));
-    if (action === 'syncTemuanInspeksi') return json_(syncTemuanInspeksiIdempotent_(body.token, body.row));
+    if (action === 'syncTemuanInspeksi') return json_(syncTemuanWithEvidenceGuard_(body.token, body.row));
     return json_(fail_('ACTION_INVALID', 'Action API tidak dikenal.'));
   } catch (error) {
     console.error(error && error.stack ? error.stack : error);
