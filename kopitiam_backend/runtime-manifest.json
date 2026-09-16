@@ -1,14 +1,14 @@
 {
   "sources": [
     "Code.js", "HarExecution.js", "IdempotentUpload.js", "RuntimeGuards.js", "SecurityValidation.js", "Setup.js", "TemuanSheetHelpers.js", "TestDummy.js", "WoSourceAudit.js", "WorkOrderContext.js", "WorkOrderCore.js",
-    "ZZ_ApiRouterOverride.js", "ZZ_MasterDataFiltered.js", "ZZ_RuntimeIntegration.js", "ZZZ_HarLegacySecure.js", "ZZZZ_AllWoTargetSecure.js", "ZZZZZ_WoCommitGuard.js", "ZZZZZZ_InsduJurusanContract.js", "ZZZZZZZ_LiveAuthorizationGuard.js", "ZZZZZZZZ_GlobalQuotaGuard.js", "ZZZZZZZZZ_LiveAccountQuota.js", "ZZZZZZZZZZ_ReceiptGuard.js", "ZZZZZZZZZZZ_HarReceiptPolicy.js", "ZZZZZZZZZZZZ_EvidenceFindingPath.js", "ZZZZZZZZZZZZZ_EvidenceRuntimeGuard.js", "ZZZZZZZZZZZZZZ_OperationJournal.js", "ZZZZZZZZZZZZZZZ_OperationJournalHardening.js", "ZZZZZZZZZZZZZZZZ_OperationJournalFinalizer.js", "ZZZZZZZZZZZZZZZZZ_OperationJournalScheduled.js", "ZZZZZZZZZZZZZZZZZZ_OperationJournalLastGuard.js", "ZZZZZZZZZZZZZZZZZZZ_OperationJournalIntegrity.js", "ZZZZZZZZZZZZZZZZZZZZ_OperationJournalFailClosed.js"
+    "ZZ_ApiRouterOverride.js", "ZZ_MasterDataFiltered.js", "ZZ_RuntimeIntegration.js", "ZZZ_HarLegacySecure.js", "ZZZZ_AllWoTargetSecure.js", "ZZZZZ_WoCommitGuard.js", "ZZZZZZ_InsduJurusanContract.js", "ZZZZZZZ_LiveAuthorizationGuard.js", "ZZZZZZZZ_GlobalQuotaGuard.js", "ZZZZZZZZZ_LiveAccountQuota.js", "ZZZZZZZZZZ_ReceiptGuard.js", "ZZZZZZZZZZZ_HarReceiptPolicy.js", "ZZZZZZZZZZZZ_EvidenceFindingPath.js", "ZZZZZZZZZZZZZ_EvidenceRuntimeGuard.js", "ZZZZZZZZZZZZZZ_OperationJournal.js", "ZZZZZZZZZZZZZZZ_OperationJournalHardening.js", "ZZZZZZZZZZZZZZZZ_OperationJournalFinalizer.js", "ZZZZZZZZZZZZZZZZZ_OperationJournalScheduled.js", "ZZZZZZZZZZZZZZZZZZ_OperationJournalLastGuard.js", "ZZZZZZZZZZZZZZZZZZZ_OperationJournalIntegrity.js", "ZZZZZZZZZZZZZZZZZZZZ_OperationJournalFailClosed.js", "ZZZZZZZZZZZZZZZZZZZZZ_Rel07BehaviorGuard.js"
   ],
   "selected": {
     "doPost": "ZZ_ApiRouterOverride.js",
     "getMasterData_": "ZZ_MasterDataFiltered.js",
     "temuanSheetHeaders_": "TemuanSheetHelpers.js",
     "temuanSheet_": "TemuanSheetHelpers.js",
-    "validateTemuanHeaders_": "TemuanSheetHelpers.js",
+    "validateTemuanHeaders_": "ZZZZZZZZZZZZZZZZZZZZZ_Rel07BehaviorGuard.js",
     "buildFindingPath_": "ZZZZZZZZZZZZZ_EvidenceRuntimeGuard.js",
     "buildC4aFindingPath_": "ZZZZZZZZZZZZZ_EvidenceRuntimeGuard.js",
     "folderPath_": "ZZZZZZZZZZZZZ_EvidenceRuntimeGuard.js",
@@ -18,9 +18,12 @@
     "operationJournalRun_": "ZZZZZZZZZZZZZZZZZZZZ_OperationJournalFailClosed.js",
     "operationJournalReplay_": "ZZZZZZZZZZZZZZZZZZZ_OperationJournalIntegrity.js",
     "operationJournalArchive_": "ZZZZZZZZZZZZZZZZ_OperationJournalFinalizer.js",
+    "operationJournalIdentity_": "ZZZZZZZZZZZZZZZZZZZZZ_Rel07BehaviorGuard.js",
     "opjVerifiedSuccess_": "ZZZZZZZZZZZZZZZZZ_OperationJournalScheduled.js",
     "opjFindingCommitReadBack_": "ZZZZZZZZZZZZZZZZZZZ_OperationJournalIntegrity.js",
+    "opjFindingProjection_": "ZZZZZZZZZZZZZZZZZZZZZ_Rel07BehaviorGuard.js",
     "opjFinish_": "ZZZZZZZZZZZZZZZZZZZ_OperationJournalIntegrity.js",
-    "operationJournalReconcileUser_": "ZZZZZZZZZZZZZZZZZZZ_OperationJournalIntegrity.js"
+    "operationJournalReconcileUser_": "ZZZZZZZZZZZZZZZZZZZ_OperationJournalIntegrity.js",
+    "operationJournalSweepStaleLeases_": "ZZZZZZZZZZZZZZZZZZZZZ_Rel07BehaviorGuard.js"
   }
 }
