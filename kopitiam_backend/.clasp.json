@@ -1,7 +1,8 @@
 {
   "scriptId": "1O6NX7eWbfwASndnykE9r9azSzdFMo8ybWIG9adaIFFVQgtN9T7jbph60",
-  "rootDir": "",
+  "rootDir": "deploy",
   "scriptExtensions": [".js", ".gs"],
   "htmlExtensions": [".html"],
-  "jsonExtensions": [".json"]
+  "jsonExtensions": [".json"],
+  "filePushOrder": ["deploy/Runtime.js"]
 }
