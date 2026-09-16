@@ -34,6 +34,7 @@ test('top-level executable overrides are rejected', () => {
 });
 test('real bundle preserves every global function and exact selected implementation', () => {
   const result = build(path.resolve(__dirname, '..'));
+  const manifest = require('../runtime-manifest.json');
   const context = vm.createContext({ContentService: {createTextOutput: text => ({text, setMimeType(){return this;}}), MimeType: {JSON:'json'}}});
   vm.runInContext(result.code, context, {timeout: 5000});
   for (const [symbol, entry] of result.winners) {
@@ -45,8 +46,12 @@ test('real bundle preserves every global function and exact selected implementat
   }
   assert.equal(JSON.parse(context.doGet({parameter:{action:'health'}}).text).success, true);
   assert.equal(JSON.parse(context.doGet({parameter:{action:'write'}}).text).kode, 'POST_REQUIRED');
-  assert.equal(result.report.functions.filter(f => f.declarations.length > 1).length, 18);
-  assert.equal(consolidate([...result.report.sources].reverse().map(s => ({name:s.file, text:require('node:fs').readFileSync(path.resolve(__dirname,'..',s.file),'utf8')})), require('../runtime-manifest.json').selected).report.functions.length, result.report.functions.length);
+  const duplicateSymbols = result.report.functions
+    .filter(f => f.declarations.length > 1)
+    .map(f => f.name)
+    .sort();
+  assert.deepEqual(duplicateSymbols, Object.keys(manifest.selected).sort());
+  assert.equal(consolidate([...result.report.sources].reverse().map(s => ({name:s.file, text:require('node:fs').readFileSync(path.resolve(__dirname,'..',s.file),'utf8')})), manifest.selected).report.functions.length, result.report.functions.length);
 });
 test('composed runtime rejects corrupt terminal receipt without business execution', () => {
   const result = build(path.resolve(__dirname, '..'));
