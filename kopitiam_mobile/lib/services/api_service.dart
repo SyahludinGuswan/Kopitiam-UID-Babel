@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'api_activity.dart';
 import 'api_backoff.dart';
 import 'device_session_service.dart';
+import 'sync_failure_store.dart';
 import 'sync_receipt.dart';
 import 'sync_request_coordinator.dart';
 
@@ -18,6 +19,12 @@ class ApiService {
   static const _redirectCodes = {301, 302, 303, 307, 308};
   static const _appsScriptHost = 'script.google.com';
   static const _contentHost = 'script.googleusercontent.com';
+  static const int _maximumSyncRequestBytes = 12 * 1024 * 1024;
+  static const _perWoRetryDelays = [
+    Duration(seconds: 10),
+    Duration(seconds: 30),
+    Duration(seconds: 90),
+  ];
   static final _jitter = Random.secure();
   static final _syncCoordinator = SyncRequestCoordinator();
 
@@ -102,26 +109,120 @@ class ApiService {
     });
   }
 
+  static bool _retryableResponse(Map<String, dynamic> response) {
+    const retryable = {
+      'SERVER_BUSY',
+      'SERVER_ERROR',
+      'WO_COMMIT_FAILED',
+      'HAR_COMMIT_FAILED',
+      'SYNC_TRANSACTION_FAILED',
+      'EVIDENCE_COMMIT_FAILED',
+    };
+    return retryable.contains('${response['kode'] ?? ''}');
+  }
+
   static Future<Map<String, dynamic>> _syncRows(
     String action,
     String token,
     List<Map<String, dynamic>> sourceRows,
   ) async {
-    final rows = SyncReceiptGuard.prepare(sourceRows);
-    final response = await _postMap({
-      'action': action,
-      'token': token,
-      'rows': rows,
-    });
-    if (!SyncReceiptGuard.verify(response, rows)) {
+    final receipts = <dynamic>[];
+    final accepted = <dynamic>[];
+    final failures = <Map<String, dynamic>>[];
+    final now = DateTime.now();
+
+    for (final source in sourceRows) {
+      final code = '${source['Kode WO'] ?? ''}'.trim();
+      if (code.isEmpty) {
+        failures.add({'kodeWo': '', 'status': 'manual-action-required', 'message': 'Kode WO kosong.'});
+        continue;
+      }
+      final prior = await SyncFailureStore.read(action, code);
+      if (prior != null && !prior.due(now)) {
+        failures.add({
+          'kodeWo': code,
+          'status': prior.status,
+          'nextAttemptAt': prior.nextAttemptAt?.toIso8601String(),
+          'message': prior.error,
+        });
+        continue;
+      }
+
+      final rows = SyncReceiptGuard.prepare([source]);
+      final envelope = {'action': action, 'token': token, 'rows': rows};
+      final requestBytes = utf8.encode(jsonEncode(envelope)).length;
+      if (requestBytes > _maximumSyncRequestBytes) {
+        final state = await SyncFailureStore.recordFailure(
+          action: action,
+          kodeWo: code,
+          error: 'Ukuran request $requestBytes byte melebihi batas aman 12 MiB.',
+          now: DateTime.now(),
+          retryable: false,
+        );
+        failures.add({'kodeWo': code, 'status': state.status, 'message': state.error});
+        continue;
+      }
+
+      Map<String, dynamic>? response;
+      Object? lastError;
+      var retryable = true;
+      for (var attempt = 0; attempt <= _perWoRetryDelays.length; attempt++) {
+        try {
+          response = await _postMap(envelope);
+          if (SyncReceiptGuard.verify(response, rows)) break;
+          lastError = response['message'] ?? response['kode'] ?? 'Receipt tidak valid.';
+          retryable = _retryableResponse(response);
+          if (!retryable) break;
+        } catch (error) {
+          lastError = error;
+          retryable = true;
+        }
+        if (attempt < _perWoRetryDelays.length) {
+          await Future<void>.delayed(_perWoRetryDelays[attempt]);
+        }
+      }
+
+      if (response != null && SyncReceiptGuard.verify(response, rows)) {
+        await SyncFailureStore.clear(action, code);
+        final rowReceipts = response['receipts'];
+        if (rowReceipts is List) receipts.addAll(rowReceipts);
+        final rowAccepted = response['accepted'];
+        if (rowAccepted is List) accepted.addAll(rowAccepted);
+        continue;
+      }
+
+      final state = await SyncFailureStore.recordFailure(
+        action: action,
+        kodeWo: code,
+        error: '$lastError',
+        now: DateTime.now(),
+        retryable: retryable,
+      );
+      failures.add({
+        'kodeWo': code,
+        'status': state.status,
+        'nextAttemptAt': state.nextAttemptAt?.toIso8601String(),
+        'message': state.error,
+      });
+    }
+
+    if (failures.isNotEmpty) {
       return {
         'success': false,
-        'kode': 'SYNC_RECEIPT_INVALID',
-        'message': 'Konfirmasi server tidak cocok dengan snapshot final. Data lokal dipertahankan.',
-        'diproses': 0,
+        'kode': 'SYNC_PARTIAL',
+        'message': '${receipts.length} WO berhasil; ${failures.length} WO tetap tersimpan untuk tindak lanjut.',
+        'diproses': receipts.length,
+        'accepted': accepted,
+        'receipts': receipts,
+        'failures': failures,
       };
     }
-    return response;
+    return {
+      'success': true,
+      'diproses': receipts.length,
+      'accepted': accepted,
+      'receipts': receipts,
+    };
   }
 
   static Future<Map<String, dynamic>> loginPerangkat(String username, String password) async {
