@@ -57,9 +57,12 @@ void main() {
       expect(source, contains('TemuanFormScreen.c4a'));
     });
 
-    test('database version 10 keeps queue migration and adds Gardu fields', () {
+    test('clean Kopitiam baseline includes queue and Gardu fields', () {
       final source = File('lib/services/sqlite_service.dart').readAsStringSync();
-      expect(source, contains('_databaseVersion = 10'));
+      final helper = File('lib/services/database_helper.dart').readAsStringSync();
+      expect(source, contains("databaseName = 'kopitiam_local.db'"));
+      expect(source, contains('databaseVersion = 1'));
+      expect(source, isNot(contains('onUpgrade:')));
       for (final column in ['sync_status', 'sync_error', 'retry_count', 'last_attempt_at']) {
         expect(source, contains(column));
       }
@@ -71,7 +74,7 @@ void main() {
         'koordinat_penginputan_lwbp',
         'jarak_gardu_petugas_lwbp',
       ]) {
-        expect(source, contains(column));
+        expect(helper, contains(column));
       }
       expect(source, contains('idx_temuan_c4a_queue'));
     });

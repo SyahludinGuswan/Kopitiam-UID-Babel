@@ -9,7 +9,7 @@ class WoSyncResult { final int total,diproses; final String? pesan; const WoSync
 class WoInsjarRepository {
   WoInsjarRepository({SqliteService? database}) : _db=database??SqliteService.instance;
   final SqliteService _db; static const table='wo_insjar';
-  Future<Database> _database() async { final db=await _db.database; final cols=await db.rawQuery('PRAGMA table_info($table)'); if(!cols.any((r)=>'${r['name']}'.toLowerCase()=='tier')) await db.execute("ALTER TABLE $table ADD COLUMN tier TEXT NOT NULL DEFAULT ''"); return db; }
+  Future<Database> _database() => _db.database;
   Future<List<WoInsjar>> semua() async { final db=await _database(); final rows=await db.query(table,orderBy:"CASE status_wo WHEN '${WoInsjar.statusMulai}' THEN 0 WHEN '${WoInsjar.statusDalam}' THEN 1 ELSE 2 END, tanggal DESC, kode_wo DESC"); return rows.map(WoInsjar.fromMap).toList(); }
   Future<List<WoInsjar>> belumTersinkron() async { final db=await _database(); final rows=await db.query(table,where:'is_dirty = 1 AND status_wo = ?',whereArgs:[WoInsjar.statusSelesai]); return rows.map(WoInsjar.fromMap).toList(); }
   Future<WoInsjar?> cariKode(String code) async { final db=await _database(); final rows=await db.query(table,where:'kode_wo = ?',whereArgs:[code],limit:1); return rows.isEmpty?null:WoInsjar.fromMap(rows.first); }

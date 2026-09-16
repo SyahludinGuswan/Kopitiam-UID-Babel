@@ -9,8 +9,8 @@ import 'database_helper.dart';
 class SqliteService {
   SqliteService._();
   static final SqliteService instance = SqliteService._();
-  static const _databaseName = 'simandist_local.db';
-  static const _databaseVersion = 10;
+  static const databaseName = 'kopitiam_local.db';
+  static const databaseVersion = 1;
   static const masterDatasets = ['User_App_Mobile','Master_Penyulang','Master_Keypoint','Master_Temuan','Jenis Pohon','Master_Material','Master_Pekerjaan_Har','Master_Gardu'];
   Database? _database;
 
@@ -18,39 +18,30 @@ class SqliteService {
     if (_database != null) return _database!;
     final root = await getDatabasesPath();
     _database = await openDatabase(
-      p.join(root, _databaseName),
-      version: _databaseVersion,
+      p.join(root, databaseName),
+      version: databaseVersion,
       onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: (db, version) async => _createSchema(db),
-      onUpgrade: (db, oldVersion, newVersion) async {
-        if (oldVersion < 2) await _createMasterSchema(db);
-        if (oldVersion < 3) await _createWoSchema(db);
-        if (oldVersion < 4) await _createWoRowSchema(db);
-        if (oldVersion < 5) await _migrateWoRowV5(db);
-        if (oldVersion < 6) await DatabaseHelper.createHarJarSchema(db);
-        if (oldVersion < 7) await DatabaseHelper.createInsduSchema(db);
-        if (oldVersion < 8) await DatabaseHelper.createYandalP0Schema(db);
-        if (oldVersion < 9) await _createC4aQueueSchema(db);
-        if (oldVersion < 10) await _migrateInsduV10(db);
-      },
     );
     return _database!;
   }
 
   Future<void> _createSchema(Database db) async {
-    await db.execute("""CREATE TABLE user_app_mobile (id INTEGER PRIMARY KEY AUTOINCREMENT, remote_no TEXT NOT NULL, kode_uiw TEXT NOT NULL DEFAULT '', kode_up3 TEXT NOT NULL DEFAULT '', kode_ulp TEXT NOT NULL DEFAULT '', ulp TEXT NOT NULL DEFAULT '', username TEXT NOT NULL COLLATE NOCASE UNIQUE, password_hash TEXT NOT NULL, password_salt TEXT NOT NULL, role TEXT NOT NULL DEFAULT '', bidang TEXT NOT NULL DEFAULT '', tim TEXT NOT NULL DEFAULT '', sub_tim TEXT NOT NULL DEFAULT '', akses_menu TEXT NOT NULL DEFAULT '', is_active INTEGER NOT NULL DEFAULT 1, source_updated_at TEXT, synced_at TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)""");
-    await db.execute("""CREATE TABLE sync_metadata (key TEXT PRIMARY KEY, remote_revision TEXT NOT NULL DEFAULT '', synced_at TEXT, row_count INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'idle', error_message TEXT NOT NULL DEFAULT '')""");
-    await _createMasterSchema(db);
-    await _createWoSchema(db);
-    await _createWoRowSchema(db);
-    await DatabaseHelper.createHarJarSchema(db);
-    await DatabaseHelper.createInsduSchema(db);
-    await DatabaseHelper.createYandalP0Schema(db);
-    await _createC4aQueueSchema(db);
+    await db.transaction((txn) async {
+      await txn.execute("""CREATE TABLE user_app_mobile (id INTEGER PRIMARY KEY AUTOINCREMENT, remote_no TEXT NOT NULL, kode_uiw TEXT NOT NULL DEFAULT '', kode_up3 TEXT NOT NULL DEFAULT '', kode_ulp TEXT NOT NULL DEFAULT '', ulp TEXT NOT NULL DEFAULT '', username TEXT NOT NULL COLLATE NOCASE UNIQUE, password_hash TEXT NOT NULL, password_salt TEXT NOT NULL, role TEXT NOT NULL DEFAULT '', bidang TEXT NOT NULL DEFAULT '', tim TEXT NOT NULL DEFAULT '', sub_tim TEXT NOT NULL DEFAULT '', akses_menu TEXT NOT NULL DEFAULT '', is_active INTEGER NOT NULL DEFAULT 1, source_updated_at TEXT, synced_at TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)""");
+      await txn.execute("""CREATE TABLE sync_metadata (key TEXT PRIMARY KEY, remote_revision TEXT NOT NULL DEFAULT '', synced_at TEXT, row_count INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'idle', error_message TEXT NOT NULL DEFAULT '')""");
+      await _createMasterSchema(txn);
+      await _createWoSchema(txn);
+      await _createWoRowSchema(txn);
+      await DatabaseHelper.createHarJarSchema(txn);
+      await DatabaseHelper.createInsduSchema(txn);
+      await DatabaseHelper.createYandalP0Schema(txn);
+      await _createC4aQueueSchema(txn);
+    });
   }
 
-  Future<void> _createC4aQueueSchema(Database db) async {
-    await db.execute("""CREATE TABLE IF NOT EXISTS temuan_inspeksi (
+  Future<void> _createC4aQueueSchema(DatabaseExecutor db) async {
+    await db.execute("""CREATE TABLE temuan_inspeksi (
       kode_temuan TEXT PRIMARY KEY, kode_wo TEXT NOT NULL DEFAULT '', kode_uiw TEXT DEFAULT '', kode_up3 TEXT DEFAULT '',
       kode_ulp TEXT DEFAULT '', ulp TEXT DEFAULT '', hari TEXT DEFAULT '', tanggal TEXT DEFAULT '', penyulang TEXT DEFAULT '',
       section_awal TEXT DEFAULT '', section_akhir TEXT DEFAULT '', section TEXT DEFAULT '', segmen TEXT DEFAULT '', nomor_gardu TEXT DEFAULT '',
@@ -60,33 +51,29 @@ class SqliteService {
       waktu_input TEXT DEFAULT '', user_input TEXT DEFAULT '', folder_path TEXT DEFAULT '', is_dirty INTEGER DEFAULT 1,
       sync_status TEXT NOT NULL DEFAULT 'queued', sync_error TEXT NOT NULL DEFAULT '', retry_count INTEGER NOT NULL DEFAULT 0,
       last_attempt_at TEXT NOT NULL DEFAULT '')""");
-    await _addColumnIfMissing(db, 'temuan_inspeksi', 'sync_status', "TEXT NOT NULL DEFAULT 'queued'");
-    await _addColumnIfMissing(db, 'temuan_inspeksi', 'sync_error', "TEXT NOT NULL DEFAULT ''");
-    await _addColumnIfMissing(db, 'temuan_inspeksi', 'retry_count', 'INTEGER NOT NULL DEFAULT 0');
-    await _addColumnIfMissing(db, 'temuan_inspeksi', 'last_attempt_at', "TEXT NOT NULL DEFAULT ''");
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_temuan_c4a_queue ON temuan_inspeksi(kode_wo,is_dirty,sync_status)');
+    await db.execute('CREATE INDEX idx_temuan_c4a_queue ON temuan_inspeksi(kode_wo,is_dirty,sync_status)');
   }
 
-  Future<void> _createMasterSchema(Database db) async {
-    await db.execute("""CREATE TABLE IF NOT EXISTS master_data_rows (id INTEGER PRIMARY KEY AUTOINCREMENT, dataset TEXT NOT NULL, row_key TEXT NOT NULL, payload_json TEXT NOT NULL, synced_at TEXT NOT NULL, UNIQUE(dataset,row_key))""");
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_master_dataset ON master_data_rows(dataset)');
+  Future<void> _createMasterSchema(DatabaseExecutor db) async {
+    await db.execute("""CREATE TABLE master_data_rows (id INTEGER PRIMARY KEY AUTOINCREMENT, dataset TEXT NOT NULL, row_key TEXT NOT NULL, payload_json TEXT NOT NULL, synced_at TEXT NOT NULL, UNIQUE(dataset,row_key))""");
+    await db.execute('CREATE INDEX idx_master_dataset ON master_data_rows(dataset)');
   }
 
-  Future<void> _createWoSchema(Database db) async {
-    await db.execute("""CREATE TABLE IF NOT EXISTS wo_insjar (
+  Future<void> _createWoSchema(DatabaseExecutor db) async {
+    await db.execute("""CREATE TABLE wo_insjar (
       id INTEGER PRIMARY KEY AUTOINCREMENT, no TEXT NOT NULL DEFAULT '', kode_wo TEXT NOT NULL UNIQUE,
       kode_uiw TEXT NOT NULL DEFAULT '', kode_up3 TEXT NOT NULL DEFAULT '', kode_ulp TEXT NOT NULL DEFAULT '', ulp TEXT NOT NULL DEFAULT '',
       hari TEXT NOT NULL DEFAULT '', tanggal TEXT NOT NULL DEFAULT '', penyulang TEXT NOT NULL DEFAULT '', section_awal TEXT NOT NULL DEFAULT '',
-      section_akhir TEXT NOT NULL DEFAULT '', section TEXT NOT NULL DEFAULT '', koordinat_awal TEXT NOT NULL DEFAULT '',
+      section_akhir TEXT NOT NULL DEFAULT '', section TEXT NOT NULL DEFAULT '', tier TEXT NOT NULL DEFAULT '', koordinat_awal TEXT NOT NULL DEFAULT '',
       koordinat_akhir TEXT NOT NULL DEFAULT '', realisasi_kms REAL, waktu_mulai TEXT NOT NULL DEFAULT '', waktu_selesai TEXT NOT NULL DEFAULT '',
       durasi_pekerjaan TEXT NOT NULL DEFAULT '', status_wo TEXT NOT NULL DEFAULT '', synced_at TEXT NOT NULL DEFAULT '', is_dirty INTEGER NOT NULL DEFAULT 0)""");
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_wo_insjar_tanggal ON wo_insjar(tanggal)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_wo_insjar_status ON wo_insjar(status_wo)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_wo_insjar_dirty ON wo_insjar(is_dirty)');
+    await db.execute('CREATE INDEX idx_wo_insjar_tanggal ON wo_insjar(tanggal)');
+    await db.execute('CREATE INDEX idx_wo_insjar_status ON wo_insjar(status_wo)');
+    await db.execute('CREATE INDEX idx_wo_insjar_dirty ON wo_insjar(is_dirty)');
   }
 
-  Future<void> _createWoRowSchema(Database db) async {
-    await db.execute("""CREATE TABLE IF NOT EXISTS wo_row (
+  Future<void> _createWoRowSchema(DatabaseExecutor db) async {
+    await db.execute("""CREATE TABLE wo_row (
       id INTEGER PRIMARY KEY AUTOINCREMENT, no TEXT NOT NULL DEFAULT '', kode_wo TEXT NOT NULL UNIQUE,
       kode_temuan TEXT NOT NULL DEFAULT '', kode_uiw TEXT NOT NULL DEFAULT '', kode_up3 TEXT NOT NULL DEFAULT '', kode_ulp TEXT NOT NULL DEFAULT '',
       ulp TEXT NOT NULL DEFAULT '', hari TEXT NOT NULL DEFAULT '', tanggal TEXT NOT NULL DEFAULT '', penyulang TEXT NOT NULL DEFAULT '',
@@ -99,29 +86,8 @@ class SqliteService {
       foto_sesudah TEXT NOT NULL DEFAULT '', link_foto_sesudah TEXT NOT NULL DEFAULT '', status_wo TEXT NOT NULL DEFAULT '', user_input TEXT NOT NULL DEFAULT '',
       waktu_input TEXT NOT NULL DEFAULT '', waktu_realisasi TEXT NOT NULL DEFAULT '', folder_path TEXT NOT NULL DEFAULT '',
       synced_at TEXT NOT NULL DEFAULT '', is_dirty INTEGER NOT NULL DEFAULT 0)""");
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_wo_row_status ON wo_row(status_wo)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_wo_row_dirty ON wo_row(is_dirty)');
-  }
-
-  Future<void> _migrateWoRowV5(Database db) async {
-    await _addColumnIfMissing(db, 'wo_row', 'section_awal', "TEXT NOT NULL DEFAULT ''");
-    await _addColumnIfMissing(db, 'wo_row', 'section_akhir', "TEXT NOT NULL DEFAULT ''");
-  }
-
-  Future<void> _migrateInsduV10(Database db) async {
-    await _addColumnIfMissing(db, DatabaseHelper.woInsduTable, 'jurusan_terpasang', 'INTEGER');
-    await _addColumnIfMissing(db, DatabaseHelper.woInsduTable, 'jurusan_terpakai', 'INTEGER');
-    await _addColumnIfMissing(db, DatabaseHelper.woInsduTable, 'koordinat_penginputan_wbp', "TEXT NOT NULL DEFAULT ''");
-    await _addColumnIfMissing(db, DatabaseHelper.woInsduTable, 'jarak_gardu_petugas_wbp', 'REAL');
-    await _addColumnIfMissing(db, DatabaseHelper.woInsduTable, 'koordinat_penginputan_lwbp', "TEXT NOT NULL DEFAULT ''");
-    await _addColumnIfMissing(db, DatabaseHelper.woInsduTable, 'jarak_gardu_petugas_lwbp', 'REAL');
-  }
-
-  Future<void> _addColumnIfMissing(Database db, String table, String column, String definition) async {
-    final rows = await db.rawQuery('PRAGMA table_info($table)');
-    if (!rows.any((row) => row['name'].toString().toLowerCase() == column.toLowerCase())) {
-      await db.execute('ALTER TABLE $table ADD COLUMN $column $definition');
-    }
+    await db.execute('CREATE INDEX idx_wo_row_status ON wo_row(status_wo)');
+    await db.execute('CREATE INDEX idx_wo_row_dirty ON wo_row(is_dirty)');
   }
 
   Future<void> replaceMasterData(Map<String, dynamic> datasets) async {
@@ -194,22 +160,11 @@ class SqliteService {
   }
 
   LocalUser _fromMap(Map<String, Object?> row) => LocalUser(
-        id: row['id'] as int?,
-        remoteNo: '${row['remote_no'] ?? ''}',
-        kodeUiw: '${row['kode_uiw'] ?? ''}',
-        kodeUp3: '${row['kode_up3'] ?? ''}',
-        kodeUlp: '${row['kode_ulp'] ?? ''}',
-        ulp: '${row['ulp'] ?? ''}',
-        username: '${row['username'] ?? ''}',
-        passwordHash: '${row['password_hash'] ?? ''}',
-        passwordSalt: '${row['password_salt'] ?? ''}',
-        role: '${row['role'] ?? ''}',
-        bidang: '${row['bidang'] ?? ''}',
-        tim: '${row['tim'] ?? ''}',
-        subTim: '${row['sub_tim'] ?? ''}',
-        aksesMenu: '${row['akses_menu'] ?? ''}',
-        isActive: row['is_active'] == 1,
-        sourceUpdatedAt: row['source_updated_at']?.toString(),
-        syncedAt: '${row['synced_at'] ?? ''}',
+        id: row['id'] as int?, remoteNo: '${row['remote_no'] ?? ''}', kodeUiw: '${row['kode_uiw'] ?? ''}',
+        kodeUp3: '${row['kode_up3'] ?? ''}', kodeUlp: '${row['kode_ulp'] ?? ''}', ulp: '${row['ulp'] ?? ''}',
+        username: '${row['username'] ?? ''}', passwordHash: '${row['password_hash'] ?? ''}', passwordSalt: '${row['password_salt'] ?? ''}',
+        role: '${row['role'] ?? ''}', bidang: '${row['bidang'] ?? ''}', tim: '${row['tim'] ?? ''}', subTim: '${row['sub_tim'] ?? ''}',
+        aksesMenu: '${row['akses_menu'] ?? ''}', isActive: row['is_active'] == 1,
+        sourceUpdatedAt: row['source_updated_at']?.toString(), syncedAt: '${row['synced_at'] ?? ''}',
       );
 }
