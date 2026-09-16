@@ -9,6 +9,7 @@ class SyncFailureState {
   final DateTime lastAttemptAt;
   final DateTime? nextAttemptAt;
   final String error;
+  final String snapshotDigest;
 
   const SyncFailureState({
     required this.status,
@@ -17,11 +18,14 @@ class SyncFailureState {
     required this.lastAttemptAt,
     required this.nextAttemptAt,
     required this.error,
+    required this.snapshotDigest,
   });
 
   bool get manualActionRequired => status == 'manual-action-required';
   bool due(DateTime now) => !manualActionRequired &&
       (nextAttemptAt == null || !nextAttemptAt!.isAfter(now));
+  bool matchesSnapshot(String digest) =>
+      snapshotDigest.isNotEmpty && snapshotDigest == digest;
 
   Map<String, dynamic> toJson() => {
         'status': status,
@@ -30,6 +34,7 @@ class SyncFailureState {
         'lastAttemptAt': lastAttemptAt.toUtc().toIso8601String(),
         'nextAttemptAt': nextAttemptAt?.toUtc().toIso8601String(),
         'error': error,
+        'snapshotDigest': snapshotDigest,
       };
 
   static SyncFailureState? fromJson(Object? value) {
@@ -45,21 +50,34 @@ class SyncFailureState {
       lastAttemptAt: last,
       nextAttemptAt: nextValue.isEmpty ? null : DateTime.tryParse(nextValue),
       error: '${value['error'] ?? ''}',
+      snapshotDigest: '${value['snapshotDigest'] ?? ''}',
     );
   }
 }
 
 class SyncFailureStore {
-  static const _prefix = 'wo_sync_failure_v1_';
+  static const _prefix = 'wo_sync_failure_v2_';
   static const retryableFailed = 'retryable-failed';
   static const manualActionRequired = 'manual-action-required';
 
-  static String _key(String action, String kodeWo) =>
-      '$_prefix${Uri.encodeComponent(action)}_${Uri.encodeComponent(kodeWo)}';
+  static String _part(String value) => Uri.encodeComponent(value.trim().toLowerCase());
+  static String _key(String owner, String action, String kodeWo) =>
+      '$_prefix${_part(owner)}_${_part(action)}_${_part(kodeWo)}';
 
-  static Future<SyncFailureState?> read(String action, String kodeWo) async {
+  static void _requireOwner(String owner) {
+    if (owner.trim().isEmpty) {
+      throw StateError('Akun terverifikasi wajib tersedia untuk status sinkron.');
+    }
+  }
+
+  static Future<SyncFailureState?> read(
+    String owner,
+    String action,
+    String kodeWo,
+  ) async {
+    _requireOwner(owner);
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key(action, kodeWo));
+    final raw = prefs.getString(_key(owner, action, kodeWo));
     if (raw == null || raw.isEmpty) return null;
     try {
       return SyncFailureState.fromJson(jsonDecode(raw));
@@ -68,19 +86,28 @@ class SyncFailureStore {
     }
   }
 
-  static Future<void> clear(String action, String kodeWo) async {
+  static Future<void> clear(
+    String owner,
+    String action,
+    String kodeWo,
+  ) async {
+    _requireOwner(owner);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_key(action, kodeWo));
+    await prefs.remove(_key(owner, action, kodeWo));
   }
 
   static Future<SyncFailureState> recordFailure({
+    required String owner,
     required String action,
     required String kodeWo,
     required String error,
+    required String snapshotDigest,
     required DateTime now,
     bool retryable = true,
   }) async {
-    final previous = await read(action, kodeWo);
+    _requireOwner(owner);
+    final old = await read(owner, action, kodeWo);
+    final previous = old != null && old.matchesSnapshot(snapshotDigest) ? old : null;
     final first = previous?.firstFailedAt ?? now;
     final cycle = (previous?.retryCycle ?? -1) + 1;
     final age = now.difference(first);
@@ -93,6 +120,7 @@ class SyncFailureStore {
         lastAttemptAt: now,
         nextAttemptAt: null,
         error: error,
+        snapshotDigest: snapshotDigest,
       );
     } else {
       final next = cycle == 0
@@ -107,10 +135,14 @@ class SyncFailureStore {
         lastAttemptAt: now,
         nextAttemptAt: next.isAfter(now) ? next : now,
         error: error,
+        snapshotDigest: snapshotDigest,
       );
     }
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key(action, kodeWo), jsonEncode(state.toJson()));
+    await prefs.setString(
+      _key(owner, action, kodeWo),
+      jsonEncode(state.toJson()),
+    );
     return state;
   }
 }
