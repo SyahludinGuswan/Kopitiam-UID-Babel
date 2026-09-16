@@ -19,10 +19,14 @@ function validateTemuanHeaders_(headers) {
 
 function opjPhotoDigest_(row, base64Key, suppliedKey) {
   var supplied = String(row[suppliedKey] || '').trim().toLowerCase();
-  if (/^[a-f0-9]{64}$/.test(supplied)) return supplied;
+  var suppliedValid = /^[a-f0-9]{64}$/.test(supplied);
   var encoded = String(row[base64Key] || '');
-  if (!encoded) return '';
-  return digestBytes_(Utilities.base64Decode(encoded));
+  if (!encoded) return suppliedValid ? supplied : '';
+  var actual = digestBytes_(Utilities.base64Decode(encoded));
+  if (suppliedValid && supplied !== actual) {
+    throw new Error('Digest foto kiriman tidak cocok dengan byte foto: ' + base64Key + '.');
+  }
+  return actual;
 }
 
 function operationJournalIdentity_(action, body, session) {

@@ -6,7 +6,7 @@ Konsolidasi ini mempertahankan nama dan parameter seluruh fungsi global, termasu
 
 ## Baseline dan status
 
-Baseline main saat pekerjaan dimulai: `bf068bf6b4413d105704255a039db7653623f477` (PR #25). REL-07 berada dalam PR #26, belum menjadi klaim produksi aman. PRD utama tetap `../docs/PRD.md`; perbedaan kebutuhan PRD dengan perilaku source tidak diubah sepihak oleh konsolidator.
+Baseline main saat pekerjaan dimulai: `bf068bf6b4413d105704255a039db7653623f477` (PR #25). REL-07 berada dalam PR #26, belum menjadi klaim produksi aman. PRD utama tetap `../docs/PRD.md`; kontrak durable journal juga dicatat langsung pada PRD tersebut.
 
 ## Alur yang dipertahankan
 
@@ -16,12 +16,12 @@ Baseline main saat pekerjaan dimulai: `bf068bf6b4413d105704255a039db7653623f477`
 4. Insjar memakai WO_Ins_Jar; Insdu memakai WO_Ins_Du. Temuan ber-WO diselesaikan melalui resolver parent; C4A tetap jalur tanpa WO.
 5. ROW/Har mengirim WO berfoto per request melalui alur yang sudah disepakati. Backend memvalidasi target, field, folder dan foto.
 6. Root Eviden diambil dari Script Property EVIDENCE_ROOT_FOLDER_ID. Folder kanonik berakhir pada Kode Temuan; koreksi path mengikuti guard yang ada.
-7. Proposal REL-07 mencatat snapshot dan jurnal, mengklaim lease, menjalankan handler, memverifikasi hasil, lalu menyimpan receipt. Rekonsiliasi bisnis masih menggunakan sesi live pengguna. Trigger hanya pemulihan lease macet dan retensi.
+7. REL-07 mencatat snapshot dan jurnal, mengklaim lease, menjalankan handler, memverifikasi hasil, lalu menyimpan receipt. Rekonsiliasi bisnis masih menggunakan sesi live pengguna. Trigger hanya pemulihan lease macet dan retensi.
 8. Mobile tidak diberi izin baru untuk menghapus pekerjaan hanya karena snapshot diterima. Kontrak receipt committed yang ada tetap berlaku; durable inbox terkelola dan receipt accepted masih rancangan terpisah.
 
 ## Build dan deployment
 
-Dari direktori ini, jalankan `npm ci`, `npm run check`, lalu `npm test`. Build memakai Acorn untuk memetakan deklarasi top-level dari daftar source eksplisit. Delapan belas kelompok nama ganda dipilih menurut manifest. Semua nama fungsi tetap ada, sedangkan body deklarasi yang tidak terpilih tidak masuk output.
+Dari direktori ini, jalankan `npm ci`, `npm run check`, lalu `npm test`. Build memakai Acorn untuk memetakan deklarasi top-level dari daftar source eksplisit. Dua puluh satu kelompok nama ganda dipilih menurut manifest. Tes mencocokkan seluruh kelompok tersebut langsung dengan registry manifest, sehingga duplicate baru tanpa keputusan eksplisit tetap gagal tertutup. Semua nama fungsi tetap ada, sedangkan body deklarasi yang tidak terpilih tidak masuk output.
 
 Output deployment: `deploy/Runtime.js` dan `deploy/appsscript.json`. `.clasp.json` menunjuk rootDir deploy. `runtime-report.json` di luar direktori deployment mencatat asal fungsi dan hash source/runtime untuk audit. Jangan mengunggah source tingkat atas atau menyalin patch Z langsung ke editor. Sebelum push, periksa `clasp status`: hanya Runtime.js dan appsscript.json yang boleh masuk.
 
@@ -42,4 +42,4 @@ Push/deploy produksi tidak dijalankan oleh perubahan PR ini. Sebelum deployment 
 
 Source patch lama tetap berada di Git untuk keterlacakan, tetapi deklarasi shadow tidak dikirim ke Apps Script. Ini konsolidasi runtime build, bukan penghapusan fisik semua file lama. Tidak ada eliminasi fungsi unik berdasarkan dugaan dead code. Perapian source selanjutnya dapat memindahkan implementasi terpilih ke modul fisik setelah pemanggil eksternal terverifikasi.
 
-Konsolidasi tidak memperbaiki otomatis kelemahan logika fungsi terpilih: validasi header Temuan, identitas jurnal Temuan ber-WO, pengikatan foto ke operation ID, atomic commit jurnal, race lease/retensi, dan otorisasi replay masih memerlukan audit perilaku. Jangan menandai REL-07 selesai hanya karena build dan CI hijau.
+Guard source REL-07 sudah mencakup validasi header Temuan, identitas Kode Temuan, pengikatan digest foto ke byte aktual, receipt checksum, lease-safe stale sweep, dan retensi yang membaca ulang record di bawah lock. Status produksi tetap memerlukan deployment bundle yang sama, pemasangan trigger, dan fault injection staging.

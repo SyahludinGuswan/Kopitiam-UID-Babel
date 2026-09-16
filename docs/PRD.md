@@ -322,3 +322,18 @@ c = √(a² + a²) = a√2   (jangkauan roboh minimum agar menyentuh jaringan)
 | `Master_Gardu`     | NO, ULP, GARDU, ALAMAT, PENYULANG, PTS/LBS, LOKASI KELAS GARDU, LINE PRIMER GARDU, KOORDINAT LAT, KOORDINAT LONG, JENIS GARDU                                                    | Dropdown `Nomor Gardu` + sumber `Penyulang`/`Section`/koordinat          |
 | `Master_Temuan`    | No, Tier, Objek Inspeksi, Temuan, Prioritas                                                                                                                                      | Dropdown `Temuan` (filter Tier + Objek Inspeksi), berlaku **lintas ULP** |
 | `db_Jenis_Temuan`  | Temuan, Prioritas                                                                                                                                                                | Fallback `LOOKUP` untuk temuan non-ROW                                   |
+
+## 9. REL-07: Jurnal Operasi Durable dan Rekonsiliasi
+
+Seluruh operasi tulis sinkronisasi WO dan Temuan melewati jurnal durable sebelum efek bisnis dijalankan. Perubahan ini tidak mengubah layar, urutan kerja petugas, field bisnis, kebijakan foto, atau aturan penghapusan data lokal.
+
+- Operation ID mengikat pengguna live, action, identitas objek kanonik, payload digest, dan digest byte foto bila relevan. Digest foto kiriman wajib cocok dengan byte foto aktual.
+- Snapshot durable tidak menyimpan token, device token, atau password. Payload dan receipt disimpan dengan checksum terpisah.
+- Status jurnal mencakup `prepared`, `processing`, `needs-reconciliation`, `committed`, `archived`, dan `purged`. Hanya receipt committed yang terverifikasi boleh dianggap sukses atau direplay.
+- Lease mencegah executor ganda. Pemulihan lease macet dan retensi membaca ulang record berdasarkan Operation ID di bawah lock sebelum mutasi.
+- Rekonsiliasi bisnis tetap memerlukan sesi pengguna live dan tidak dapat dijalankan trigger tanpa otorisasi pengguna.
+- Temuan hanya committed setelah hasil Sheet dan Drive dibaca ulang, seluruh field kiriman terpetakan, folder serta foto cocok, dan receipt final lolos verifikasi.
+- Mobile hanya boleh menghapus data lokal setelah menerima receipt committed yang cocok. Status prepared atau needs-reconciliation bukan sukses.
+- Retensi aktif adalah 30 hari untuk committed/resolved dan 90 hari untuk gagal. Arsip disimpan satu tahun; record unresolved tidak dihapus otomatis.
+
+Deployment produksi, pemasangan trigger, konfigurasi Script Properties, dan fault injection staging adalah tahap verifikasi terpisah setelah source digabung.

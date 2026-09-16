@@ -137,28 +137,41 @@ function opjMovePayloadToArchive_(fileId) {
 }
 
 function operationJournalArchive_() {
-  var source = operationJournalSheet_(), last = source.sheet.getLastRow();
+  var snapshotSource = operationJournalSheet_(), last = snapshotSource.sheet.getLastRow();
   if (last < 2) return { success: true, archived: 0, purged: 0 };
-  var values = source.sheet.getRange(2, 1, last - 1, source.headers.length).getDisplayValues();
+  var operationColumn = opjColumn_(snapshotSource, 'Operation ID');
+  var snapshot = snapshotSource.sheet.getRange(2, 1, last - 1, snapshotSource.headers.length).getDisplayValues();
   var now = operationJournalNow_(), archived = 0, purged = 0;
-  for (var i = 0; i < values.length; i++) {
-    var state = normalize_(values[i][opjColumn_(source, 'State')]);
-    var due = Date.parse(values[i][opjColumn_(source, 'Archive After')] || '');
-    var fileId = values[i][opjColumn_(source, 'Payload File ID')];
-    if (!isFinite(due) || due > now.getTime()) continue;
-    if (state === 'committed' || state === 'resolved') {
-      if (fileId) opjMovePayloadToArchive_(fileId);
-      operationJournalWrite_(source, i + 2, {
-        'State': 'archived', 'Archived At': operationJournalIso_(now),
-        'Archive After': operationJournalIso_(operationJournalAddDays_(now, OPERATION_JOURNAL_ARCHIVE_DAYS_))
-      });
-      archived++;
-    } else if (state === 'archived') {
-      if (fileId) try { DriveApp.getFileById(fileId).setTrashed(true); } catch (_) {}
-      operationJournalWrite_(source, i + 2, { 'State': 'purged', 'Payload File ID': '', 'Archive After': '' });
-      purged++;
+  for (var i = 0; i < snapshot.length; i++) {
+    var operationId = String(snapshot[i][operationColumn] || '').trim();
+    if (!operationId) continue;
+    var lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      var source = operationJournalSheet_();
+      var found = operationJournalFind_(source, operationId);
+      if (!found) continue;
+      var record = operationJournalObject_(source, found);
+      var state = normalize_(record['State']);
+      var due = Date.parse(record['Archive After'] || '');
+      var fileId = record['Payload File ID'];
+      if (!isFinite(due) || due > now.getTime()) continue;
+      if (state === 'committed' || state === 'resolved') {
+        if (fileId) opjMovePayloadToArchive_(fileId);
+        operationJournalWrite_(source, found.rowNumber, {
+          'State': 'archived', 'Archived At': operationJournalIso_(now),
+          'Archive After': operationJournalIso_(operationJournalAddDays_(now, OPERATION_JOURNAL_ARCHIVE_DAYS_))
+        });
+        archived++;
+      } else if (state === 'archived') {
+        if (fileId) try { DriveApp.getFileById(fileId).setTrashed(true); } catch (_) {}
+        operationJournalWrite_(source, found.rowNumber, { 'State': 'purged', 'Payload File ID': '', 'Archive After': '' });
+        purged++;
+      }
+      /* prepared/processing/needs-reconciliation are never auto-deleted. */
+    } finally {
+      lock.releaseLock();
     }
-    /* prepared/processing/needs-reconciliation are never auto-deleted. */
   }
   return { success: true, archived: archived, purged: purged };
 }
