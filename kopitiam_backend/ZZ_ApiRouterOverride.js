@@ -1,4 +1,4 @@
-/* Final API router override with split master endpoints. */
+/* Final API router override with durable journal reconciliation. */
 function doPost(e) {
   try {
     var body = parseBody_(e);
@@ -15,21 +15,22 @@ function doPost(e) {
     if (!live.success) return json_(live);
     var accountQuota = consumeLiveAccountQuota_(action, live.sesi);
     if (!accountQuota.success) return json_(accountQuota);
+    try { operationJournalReconcileUser_(live.sesi, body.token, 1); } catch (reconcileError) { console.error('Journal reconcile:', reconcileError); }
     if (action === 'getRoleProfile' || action === 'getProfilPeran') return json_(getRoleProfile_(body.token));
     if (action === 'cekSesi') return json_(cekSesi_(body.token));
     if (action === 'getMasterData') return json_(getMasterData_(body.token));
     if (action === 'getMasterGardu') return json_(getMasterGardu_(body.token));
     if (action === 'getWoInsjar') return json_(getWoInsjar_(body.token));
-    if (action === 'syncWoInsjar') return json_(syncWoNoPhotoReceipt_(body.token, 'insjar', CONFIG.WO_INSJAR_SHEET, body.rows));
+    if (action === 'syncWoInsjar') return json_(operationJournalRun_(action, body, live.sesi, function () { return syncWoNoPhotoReceipt_(body.token, 'insjar', CONFIG.WO_INSJAR_SHEET, body.rows); }));
     if (action === 'getWoInsdu') return json_(getWoInsdu_(body.token));
-    if (action === 'syncWoInsdu') return json_(syncWoInsduReceipt_(body.token, body.rows));
+    if (action === 'syncWoInsdu') return json_(operationJournalRun_(action, body, live.sesi, function () { return syncWoInsduReceipt_(body.token, body.rows); }));
     if (action === 'getWoRow') return json_(getWoRow_(body.token));
-    if (action === 'syncWoRow') return json_(syncWoPhotoWithEvidenceGuard_(body.token, 'row', CONFIG.WO_ROW_SHEET, body.rows));
+    if (action === 'syncWoRow') return json_(operationJournalRun_(action, body, live.sesi, function () { return syncWoPhotoWithEvidenceGuard_(body.token, 'row', CONFIG.WO_ROW_SHEET, body.rows); }));
     if (action === 'getWoHarJar') return json_(getHarExecution_(body.token, 'jar'));
     if (action === 'getWoHarDu') return json_(getHarExecution_(body.token, 'du'));
-    if (action === 'syncWoHarJar' || action === 'syncWoHarDu') return json_(syncHarWithEvidenceGuard_(body.token, action === 'syncWoHarJar' ? 'jar' : 'du', body.rows));
+    if (action === 'syncWoHarJar' || action === 'syncWoHarDu') return json_(operationJournalRun_(action, body, live.sesi, function () { return syncHarWithEvidenceGuard_(body.token, action === 'syncWoHarJar' ? 'jar' : 'du', body.rows); }));
     if (action === 'getTemuanInspeksi') return json_(getTemuanInspeksi_(body.token, body.kodeWo));
-    if (action === 'syncTemuanInspeksi') return json_(syncTemuanWithEvidenceGuard_(body.token, body.row));
+    if (action === 'syncTemuanInspeksi') return json_(operationJournalRun_(action, body, live.sesi, function () { return syncTemuanWithEvidenceGuard_(body.token, body.row); }));
     return json_(fail_('ACTION_INVALID', 'Action API tidak dikenal.'));
   } catch (error) {
     console.error(error && error.stack ? error.stack : error);
