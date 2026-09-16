@@ -48,7 +48,7 @@ test('real bundle preserves every global function and exact selected implementat
   assert.equal(JSON.parse(context.doGet({parameter:{action:'write'}}).text).kode, 'POST_REQUIRED');
   const duplicateSymbols = result.report.functions
     .filter(f => f.declarations.length > 1)
-    .map(f => f.name)
+    .map(f => f.symbol)
     .sort();
   assert.deepEqual(duplicateSymbols, Object.keys(manifest.selected).sort());
   assert.equal(consolidate([...result.report.sources].reverse().map(s => ({name:s.file, text:require('node:fs').readFileSync(path.resolve(__dirname,'..',s.file),'utf8')})), manifest.selected).report.functions.length, result.report.functions.length);
