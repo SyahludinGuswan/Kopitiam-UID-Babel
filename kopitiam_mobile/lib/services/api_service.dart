@@ -109,6 +109,16 @@ class ApiService {
     });
   }
 
+  static Future<Map<String, dynamic>> _postSingleSyncAttempt(
+    String action,
+    Map<String, dynamic> payload,
+  ) => ApiActivity.track(
+        action,
+        () => _syncCoordinator.run(
+          () async => _decode(await _postAppsScript(payload)),
+        ),
+      );
+
   static bool _retryableResponse(Map<String, dynamic> response) {
     const retryable = {
       'SERVER_BUSY',
@@ -121,15 +131,29 @@ class ApiService {
     return retryable.contains('${response['kode'] ?? ''}');
   }
 
+  static Future<void> resetSyncFailure(String action, String kodeWo) async {
+    final owner = await DeviceSessionService.verifiedUsername();
+    if (owner.isEmpty) throw StateError('Akun terverifikasi tidak tersedia.');
+    await SyncFailureStore.clear(owner, action, kodeWo);
+  }
+
   static Future<Map<String, dynamic>> _syncRows(
     String action,
     String token,
     List<Map<String, dynamic>> sourceRows,
   ) async {
+    final owner = await DeviceSessionService.verifiedUsername();
+    if (owner.isEmpty) {
+      return {
+        'success': false,
+        'kode': 'SYNC_OWNER_REQUIRED',
+        'message': 'Akun terverifikasi wajib tersedia sebelum sinkronisasi.',
+        'diproses': 0,
+      };
+    }
     final receipts = <dynamic>[];
     final accepted = <dynamic>[];
     final failures = <Map<String, dynamic>>[];
-    final now = DateTime.now();
 
     for (final source in sourceRows) {
       final code = '${source['Kode WO'] ?? ''}'.trim();
@@ -137,7 +161,14 @@ class ApiService {
         failures.add({'kodeWo': '', 'status': 'manual-action-required', 'message': 'Kode WO kosong.'});
         continue;
       }
-      final prior = await SyncFailureStore.read(action, code);
+      final rows = SyncReceiptGuard.prepare([source]);
+      final snapshotDigest = '${rows.single['clientPayloadDigest'] ?? ''}';
+      var prior = await SyncFailureStore.read(owner, action, code);
+      if (prior != null && !prior.matchesSnapshot(snapshotDigest)) {
+        await SyncFailureStore.clear(owner, action, code);
+        prior = null;
+      }
+      final now = DateTime.now();
       if (prior != null && !prior.due(now)) {
         failures.add({
           'kodeWo': code,
@@ -148,14 +179,15 @@ class ApiService {
         continue;
       }
 
-      final rows = SyncReceiptGuard.prepare([source]);
       final envelope = {'action': action, 'token': token, 'rows': rows};
       final requestBytes = utf8.encode(jsonEncode(envelope)).length;
       if (requestBytes > _maximumSyncRequestBytes) {
         final state = await SyncFailureStore.recordFailure(
+          owner: owner,
           action: action,
           kodeWo: code,
           error: 'Ukuran request $requestBytes byte melebihi batas aman 12 MiB.',
+          snapshotDigest: snapshotDigest,
           now: DateTime.now(),
           retryable: false,
         );
@@ -168,7 +200,7 @@ class ApiService {
       var retryable = true;
       for (var attempt = 0; attempt <= _perWoRetryDelays.length; attempt++) {
         try {
-          response = await _postMap(envelope);
+          response = await _postSingleSyncAttempt(action, envelope);
           if (SyncReceiptGuard.verify(response, rows)) break;
           lastError = response['message'] ?? response['kode'] ?? 'Receipt tidak valid.';
           retryable = _retryableResponse(response);
@@ -183,7 +215,7 @@ class ApiService {
       }
 
       if (response != null && SyncReceiptGuard.verify(response, rows)) {
-        await SyncFailureStore.clear(action, code);
+        await SyncFailureStore.clear(owner, action, code);
         final rowReceipts = response['receipts'];
         if (rowReceipts is List) receipts.addAll(rowReceipts);
         final rowAccepted = response['accepted'];
@@ -192,9 +224,11 @@ class ApiService {
       }
 
       final state = await SyncFailureStore.recordFailure(
+        owner: owner,
         action: action,
         kodeWo: code,
         error: '$lastError',
+        snapshotDigest: snapshotDigest,
         now: DateTime.now(),
         retryable: retryable,
       );
@@ -253,7 +287,7 @@ class ApiService {
   static Future<Map<String, dynamic>> syncWoRow(String token, List<Map<String, dynamic>> rows) => _syncRows('syncWoRow', token, rows);
   static Future<Map<String, dynamic>> getWoHarJar(String token) => _postMap({'action': 'getWoHarJar', 'token': token});
   static Future<Map<String, dynamic>> syncWoHarJar(String token, List<Map<String, dynamic>> rows) => _syncRows('syncWoHarJar', token, rows);
-  static Future<Map<String, dynamic>> getWoHarDu(String token) => _postMap({'action': 'getWoHarDu', 'token': token});
+  static Future<Map<String, dynamic>> getWoHarDu(String token) => _postMap({'action': 'getWoHarDu', token: token});
   static Future<Map<String, dynamic>> syncWoHarDu(String token, List<Map<String, dynamic>> rows) => _syncRows('syncWoHarDu', token, rows);
   static Future<Map<String, dynamic>> getWoInsdu(String token) => _postMap({'action': 'getWoInsdu', 'token': token});
   static Future<Map<String, dynamic>> syncWoInsdu(String token, List<Map<String, dynamic>> rows) => _syncRows('syncWoInsdu', token, rows);
