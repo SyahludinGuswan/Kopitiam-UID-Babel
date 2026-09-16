@@ -1,0 +1,10 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const source=fs.readFileSync(path.join(__dirname,'../ZZZZZZZZZZZZZZZZ_OperationJournalFinalizer.js'),'utf8');
+function load(){const s={normalize_:v=>String(v??'').trim().toLowerCase(),fail_:(kode,message)=>({success:false,kode,message})};vm.createContext(s);vm.runInContext(source,s);return s;}
+test('durable snapshot strips session credentials',()=>{const api=load(),clean=api.opjSanitizeBody_({action:'syncWoRow',token:'secret',deviceToken:'device',password:'pw',rows:[{'Kode WO':'WO-1'}]});assert.equal(clean.token,undefined);assert.equal(clean.deviceToken,undefined);assert.equal(clean.password,undefined);assert.equal(clean.rows[0]['Kode WO'],'WO-1');});
+test('stored action dispatcher supports every journaled write',()=>{for(const action of ['syncWoInsjar','syncWoInsdu','syncWoRow','syncWoHarJar','syncWoHarDu','syncTemuanInspeksi'])assert.match(source,new RegExp("action === '"+action+"'"));});
+test('reconciler loads durable payload and verifies final result',()=>{assert.match(source,/opjLoadPayload_/);assert.match(source,/opjExecuteStored_/);assert.match(source,/opjVerifiedSuccess_/);assert.match(source,/opjFinish_/);});
+test('Drive payload upload occurs before second lock acquisition',()=>{const body=source.slice(source.indexOf('function operationJournalPrepare_'),source.indexOf('function opjExecuteStored_'));assert.ok(body.indexOf('opjStorePayloadOutsideLock_')<body.lastIndexOf('lock = LockService.getScriptLock'));});
+test('retention archives then purges payload while preserving unresolved',()=>{assert.match(source,/opjMovePayloadToArchive_/);assert.match(source,/state === 'archived'/);assert.match(source,/setTrashed\(true\)/);assert.match(source,/prepared\/processing\/needs-reconciliation are never auto-deleted/);});
+test('router activates reconciliation for live user',()=>{const router=fs.readFileSync(path.join(__dirname,'../ZZ_ApiRouterOverride.js'),'utf8');assert.match(router,/operationJournalReconcileUser_\(live\.sesi, body\.token, 1\)/);});

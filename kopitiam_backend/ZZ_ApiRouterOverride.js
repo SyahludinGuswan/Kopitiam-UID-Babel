@@ -1,4 +1,4 @@
-/* Final API router override with split master endpoints. */
+/* Final API router override with durable journal reconciliation. */
 function doPost(e) {
   try {
     var body = parseBody_(e);
@@ -15,6 +15,7 @@ function doPost(e) {
     if (!live.success) return json_(live);
     var accountQuota = consumeLiveAccountQuota_(action, live.sesi);
     if (!accountQuota.success) return json_(accountQuota);
+    try { operationJournalReconcileUser_(live.sesi, body.token, 1); } catch (reconcileError) { console.error('Journal reconcile:', reconcileError); }
     if (action === 'getRoleProfile' || action === 'getProfilPeran') return json_(getRoleProfile_(body.token));
     if (action === 'cekSesi') return json_(cekSesi_(body.token));
     if (action === 'getMasterData') return json_(getMasterData_(body.token));
