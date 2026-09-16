@@ -20,11 +20,7 @@ class ApiService {
   static const _appsScriptHost = 'script.google.com';
   static const _contentHost = 'script.googleusercontent.com';
   static const int _maximumSyncRequestBytes = 12 * 1024 * 1024;
-  static const _perWoRetryDelays = [
-    Duration(seconds: 10),
-    Duration(seconds: 30),
-    Duration(seconds: 90),
-  ];
+  static const _perWoRetryDelays = [Duration(seconds: 10), Duration(seconds: 30), Duration(seconds: 90)];
   static final _jitter = Random.secure();
   static final _syncCoordinator = SyncRequestCoordinator();
 
@@ -40,9 +36,7 @@ class ApiService {
     final client = http.Client();
     final timeout = _timeoutFor(payload);
     final initialUri = Uri.parse(baseUrl);
-    if (initialUri.scheme != 'https' || initialUri.host != _appsScriptHost) {
-      throw StateError('Alamat API Apps Script tidak valid.');
-    }
+    if (initialUri.scheme != 'https' || initialUri.host != _appsScriptHost) throw StateError('Alamat API Apps Script tidak valid.');
     try {
       final request = http.Request('POST', initialUri)
         ..followRedirects = false
@@ -54,25 +48,15 @@ class ApiService {
       final location = response.headers['location'];
       if (location == null || location.trim().isEmpty) throw StateError('API mengirim redirect tanpa alamat tujuan.');
       final contentUri = initialUri.resolve(location.trim());
-      if (contentUri.scheme != 'https' || contentUri.host != _contentHost) {
-        throw StateError('Redirect respons API menuju alamat yang tidak diizinkan.');
-      }
-      final contentRequest = http.Request('GET', contentUri)
-        ..followRedirects = false
-        ..headers['Accept'] = 'application/json';
+      if (contentUri.scheme != 'https' || contentUri.host != _contentHost) throw StateError('Redirect respons API menuju alamat yang tidak diizinkan.');
+      final contentRequest = http.Request('GET', contentUri)..followRedirects = false..headers['Accept'] = 'application/json';
       final contentResponse = await http.Response.fromStream(await client.send(contentRequest).timeout(timeout));
-      if (_redirectCodes.contains(contentResponse.statusCode)) {
-        throw StateError('Redirect ContentService berulang (HTTP ${contentResponse.statusCode}). Perbarui deployment Apps Script.');
-      }
+      if (_redirectCodes.contains(contentResponse.statusCode)) throw StateError('Redirect ContentService berulang (HTTP ${contentResponse.statusCode}). Perbarui deployment Apps Script.');
       return contentResponse;
     } on TimeoutException {
       final action = '${payload['action'] ?? 'permintaan'}';
-      throw StateError(action.startsWith('sync')
-          ? 'Sinkronisasi melewati batas waktu. Periksa jaringan lalu coba lagi; data lokal tetap aman.'
-          : 'Server terlalu lama merespons. Periksa jaringan lalu coba lagi.');
-    } finally {
-      client.close();
-    }
+      throw StateError(action.startsWith('sync') ? 'Sinkronisasi melewati batas waktu. Periksa jaringan lalu coba lagi; data lokal tetap aman.' : 'Server terlalu lama merespons. Periksa jaringan lalu coba lagi.');
+    } finally { client.close(); }
   }
 
   static Map<String, dynamic> _decode(http.Response response) {
@@ -89,11 +73,7 @@ class ApiService {
     while (true) {
       final response = _decode(await _postAppsScript(payload));
       if (!ApiBackoff.shouldRetry(response, retryCount)) return response;
-      final delay = ApiBackoff.delayFor(
-        retryCount: retryCount,
-        retryAfterSeconds: response['retryAfterSeconds'],
-        jitterMilliseconds: _jitter.nextInt(1001),
-      );
+      final delay = ApiBackoff.delayFor(retryCount: retryCount, retryAfterSeconds: response['retryAfterSeconds'], jitterMilliseconds: _jitter.nextInt(1001));
       retryCount++;
       await Future<void>.delayed(delay);
     }
@@ -101,33 +81,14 @@ class ApiService {
 
   static Future<Map<String, dynamic>> _postMap(Map<String, dynamic> payload) {
     final action = '${payload['action'] ?? ''}';
-    return ApiActivity.track(action, () {
-      if (action.startsWith('sync')) {
-        return _syncCoordinator.run(() => _sendWithBackoff(payload));
-      }
-      return _sendWithBackoff(payload);
-    });
+    return ApiActivity.track(action, () => action.startsWith('sync') ? _syncCoordinator.run(() => _sendWithBackoff(payload)) : _sendWithBackoff(payload));
   }
 
-  static Future<Map<String, dynamic>> _postSingleSyncAttempt(
-    String action,
-    Map<String, dynamic> payload,
-  ) => ApiActivity.track(
-        action,
-        () => _syncCoordinator.run(
-          () async => _decode(await _postAppsScript(payload)),
-        ),
-      );
+  static Future<Map<String, dynamic>> _postSingleSyncAttempt(String action, Map<String, dynamic> payload) =>
+      ApiActivity.track(action, () => _syncCoordinator.run(() async => _decode(await _postAppsScript(payload))));
 
   static bool _retryableResponse(Map<String, dynamic> response) {
-    const retryable = {
-      'SERVER_BUSY',
-      'SERVER_ERROR',
-      'WO_COMMIT_FAILED',
-      'HAR_COMMIT_FAILED',
-      'SYNC_TRANSACTION_FAILED',
-      'EVIDENCE_COMMIT_FAILED',
-    };
+    const retryable = {'SERVER_BUSY', 'SERVER_ERROR', 'WO_COMMIT_FAILED', 'HAR_COMMIT_FAILED', 'SYNC_TRANSACTION_FAILED', 'EVIDENCE_COMMIT_FAILED'};
     return retryable.contains('${response['kode'] ?? ''}');
   }
 
@@ -137,30 +98,16 @@ class ApiService {
     await SyncFailureStore.clear(owner, action, kodeWo);
   }
 
-  static Future<Map<String, dynamic>> _syncRows(
-    String action,
-    String token,
-    List<Map<String, dynamic>> sourceRows,
-  ) async {
+  static Future<Map<String, dynamic>> _syncRows(String action, String token, List<Map<String, dynamic>> sourceRows) async {
     final owner = await DeviceSessionService.verifiedUsername();
-    if (owner.isEmpty) {
-      return {
-        'success': false,
-        'kode': 'SYNC_OWNER_REQUIRED',
-        'message': 'Akun terverifikasi wajib tersedia sebelum sinkronisasi.',
-        'diproses': 0,
-      };
-    }
+    if (owner.isEmpty) return {'success': false, 'kode': 'SYNC_OWNER_REQUIRED', 'message': 'Akun terverifikasi wajib tersedia sebelum sinkronisasi.', 'diproses': 0};
     final receipts = <dynamic>[];
     final accepted = <dynamic>[];
     final failures = <Map<String, dynamic>>[];
 
     for (final source in sourceRows) {
       final code = '${source['Kode WO'] ?? ''}'.trim();
-      if (code.isEmpty) {
-        failures.add({'kodeWo': '', 'status': 'manual-action-required', 'message': 'Kode WO kosong.'});
-        continue;
-      }
+      if (code.isEmpty) { failures.add({'kodeWo': '', 'status': 'manual-action-required', 'message': 'Kode WO kosong.'}); continue; }
       final rows = SyncReceiptGuard.prepare([source]);
       final snapshotDigest = '${rows.single['clientPayloadDigest'] ?? ''}';
       var prior = await SyncFailureStore.read(owner, action, code);
@@ -170,27 +117,14 @@ class ApiService {
       }
       final now = DateTime.now();
       if (prior != null && !prior.due(now)) {
-        failures.add({
-          'kodeWo': code,
-          'status': prior.status,
-          'nextAttemptAt': prior.nextAttemptAt?.toIso8601String(),
-          'message': prior.error,
-        });
+        failures.add({'kodeWo': code, 'status': prior.status, 'nextAttemptAt': prior.nextAttemptAt?.toIso8601String(), 'message': prior.error});
         continue;
       }
 
       final envelope = {'action': action, 'token': token, 'rows': rows};
       final requestBytes = utf8.encode(jsonEncode(envelope)).length;
       if (requestBytes > _maximumSyncRequestBytes) {
-        final state = await SyncFailureStore.recordFailure(
-          owner: owner,
-          action: action,
-          kodeWo: code,
-          error: 'Ukuran request $requestBytes byte melebihi batas aman 12 MiB.',
-          snapshotDigest: snapshotDigest,
-          now: DateTime.now(),
-          retryable: false,
-        );
+        final state = await SyncFailureStore.recordFailure(owner: owner, action: action, kodeWo: code, error: 'Ukuran request $requestBytes byte melebihi batas aman 12 MiB.', snapshotDigest: snapshotDigest, now: DateTime.now(), retryable: false);
         failures.add({'kodeWo': code, 'status': state.status, 'message': state.error});
         continue;
       }
@@ -205,13 +139,8 @@ class ApiService {
           lastError = response['message'] ?? response['kode'] ?? 'Receipt tidak valid.';
           retryable = _retryableResponse(response);
           if (!retryable) break;
-        } catch (error) {
-          lastError = error;
-          retryable = true;
-        }
-        if (attempt < _perWoRetryDelays.length) {
-          await Future<void>.delayed(_perWoRetryDelays[attempt]);
-        }
+        } catch (error) { lastError = error; retryable = true; }
+        if (attempt < _perWoRetryDelays.length) await Future<void>.delayed(_perWoRetryDelays[attempt]);
       }
 
       if (response != null && SyncReceiptGuard.verify(response, rows)) {
@@ -223,59 +152,25 @@ class ApiService {
         continue;
       }
 
-      final state = await SyncFailureStore.recordFailure(
-        owner: owner,
-        action: action,
-        kodeWo: code,
-        error: '$lastError',
-        snapshotDigest: snapshotDigest,
-        now: DateTime.now(),
-        retryable: retryable,
-      );
-      failures.add({
-        'kodeWo': code,
-        'status': state.status,
-        'nextAttemptAt': state.nextAttemptAt?.toIso8601String(),
-        'message': state.error,
-      });
+      final state = await SyncFailureStore.recordFailure(owner: owner, action: action, kodeWo: code, error: '$lastError', snapshotDigest: snapshotDigest, now: DateTime.now(), retryable: retryable);
+      failures.add({'kodeWo': code, 'status': state.status, 'nextAttemptAt': state.nextAttemptAt?.toIso8601String(), 'message': state.error});
     }
 
-    if (failures.isNotEmpty) {
-      return {
-        'success': false,
-        'kode': 'SYNC_PARTIAL',
-        'message': '${receipts.length} WO berhasil; ${failures.length} WO tetap tersimpan untuk tindak lanjut.',
-        'diproses': receipts.length,
-        'accepted': accepted,
-        'receipts': receipts,
-        'failures': failures,
-      };
-    }
-    return {
-      'success': true,
-      'diproses': receipts.length,
-      'accepted': accepted,
-      'receipts': receipts,
-    };
+    if (failures.isNotEmpty) return {'success': false, 'kode': 'SYNC_PARTIAL', 'message': '${receipts.length} WO berhasil; ${failures.length} WO tetap tersimpan untuk tindak lanjut.', 'diproses': receipts.length, 'accepted': accepted, 'receipts': receipts, 'failures': failures};
+    return {'success': true, 'diproses': receipts.length, 'accepted': accepted, 'receipts': receipts};
   }
 
   static Future<Map<String, dynamic>> loginPerangkat(String username, String password) async {
     final device = await DeviceSessionService.deviceName();
     final response = await _postMap({'action': 'loginPerangkat', 'username': username, 'password': password, 'perangkat': device});
     if (response['success'] == true && response['deviceToken'] != null) {
-      response['roleVerifiedOnline'] = true;
-      response['offlineLogin'] = false;
+      response['roleVerifiedOnline'] = true; response['offlineLogin'] = false;
       await DeviceSessionService.save(deviceToken: response['deviceToken'].toString(), profile: response);
     }
     return response;
   }
 
-  static Future<Map<String, dynamic>> cekPerangkat() async {
-    final device = await DeviceSessionService.token();
-    if (device.isEmpty) return {'success': false, 'kode': 'TANPA_TOKEN'};
-    return _postMap({'action': 'cekPerangkat', 'deviceToken': device});
-  }
-
+  static Future<Map<String, dynamic>> cekPerangkat() async { final device = await DeviceSessionService.token(); if (device.isEmpty) return {'success': false, 'kode': 'TANPA_TOKEN'}; return _postMap({'action': 'cekPerangkat', 'deviceToken': device}); }
   static Future<Map<String, dynamic>> getRoleProfile(String token) => _postMap({'action': 'getRoleProfile', 'token': token});
   static Future<Map<String, dynamic>> getMasterData(String token) => _postMap({'action': 'getMasterData', 'token': token});
   static Future<Map<String, dynamic>> getMasterGardu(String token) => _postMap({'action': 'getMasterGardu', 'token': token});
@@ -287,20 +182,12 @@ class ApiService {
   static Future<Map<String, dynamic>> syncWoRow(String token, List<Map<String, dynamic>> rows) => _syncRows('syncWoRow', token, rows);
   static Future<Map<String, dynamic>> getWoHarJar(String token) => _postMap({'action': 'getWoHarJar', 'token': token});
   static Future<Map<String, dynamic>> syncWoHarJar(String token, List<Map<String, dynamic>> rows) => _syncRows('syncWoHarJar', token, rows);
-  static Future<Map<String, dynamic>> getWoHarDu(String token) => _postMap({'action': 'getWoHarDu', token: token});
+  static Future<Map<String, dynamic>> getWoHarDu(String token) => _postMap({'action': 'getWoHarDu', 'token': token});
   static Future<Map<String, dynamic>> syncWoHarDu(String token, List<Map<String, dynamic>> rows) => _syncRows('syncWoHarDu', token, rows);
   static Future<Map<String, dynamic>> getWoInsdu(String token) => _postMap({'action': 'getWoInsdu', 'token': token});
   static Future<Map<String, dynamic>> syncWoInsdu(String token, List<Map<String, dynamic>> rows) => _syncRows('syncWoInsdu', token, rows);
 
-  static Future<Map<String, dynamic>> logoutPerangkat({String token = ''}) async {
-    final device = await DeviceSessionService.token();
-    try {
-      return await _postMap({'action': 'logoutPerangkat', 'deviceToken': device, 'token': token});
-    } finally {
-      await DeviceSessionService.clear();
-    }
-  }
-
+  static Future<Map<String, dynamic>> logoutPerangkat({String token = ''}) async { final device = await DeviceSessionService.token(); try { return await _postMap({'action': 'logoutPerangkat', 'deviceToken': device, 'token': token}); } finally { await DeviceSessionService.clear(); } }
   static Future<Map<String, dynamic>> login(String username, String password) => loginPerangkat(username, password);
   static Future<Map<String, dynamic>> cekSesi(String token) => cekPerangkat();
   static Future<Map<String, dynamic>> logout(String token) => logoutPerangkat(token: token);
