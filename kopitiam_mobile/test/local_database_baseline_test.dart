@@ -3,14 +3,19 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  final sqliteSource = File('lib/services/sqlite_service.dart').readAsStringSync();
-  final helperSource = File('lib/services/database_helper.dart').readAsStringSync();
-  final insjarSource = File('lib/services/wo_insjar_repository.dart').readAsStringSync();
-  final insduSource = File('lib/services/wo_insdu_repository.dart').readAsStringSync();
+  final sqliteSource = File('lib/services/sqlite_service.dart')
+      .readAsStringSync();
+  final helperSource = File('lib/services/database_helper.dart')
+      .readAsStringSync();
+  final insjarSource = File('lib/services/wo_insjar_repository.dart')
+      .readAsStringSync();
+  final insduSource = File('lib/services/wo_insdu_repository.dart')
+      .readAsStringSync();
 
   test('local database uses a clean Kopitiam baseline', () {
-    final storageSource = File('lib/services/local_account_storage.dart').readAsStringSync();
-    expect(storageSource, contains("legacyDatabaseName = 'kopitiam_local.db'"));
+    final storageSource = File('lib/services/local_account_storage.dart')
+        .readAsStringSync();
+    expect(storageSource, contains("_databasePrefix = 'kopitiam_account_'"));
     expect(storageSource, contains("_accountsDirectory = 'kopitiam_accounts'"));
     expect(sqliteSource, contains('LocalAccountStorage'));
     expect(sqliteSource, contains('databaseVersion = 1'));
@@ -22,10 +27,15 @@ void main() {
   test('all current Insjar and Insdu columns exist in baseline schema', () {
     expect(sqliteSource, contains("tier TEXT NOT NULL DEFAULT ''"));
     for (final column in [
-      'jurusan_terpasang', 'jurusan_terpakai', 'kapasitas',
-      'arus_maksimal_per_fasa', 'koordinat_penginputan_wbp',
-      'waktu_penginputan_wbp', 'jarak_gardu_petugas_wbp',
-      'koordinat_penginputan_lwbp', 'waktu_penginputan_lwbp',
+      'jurusan_terpasang',
+      'jurusan_terpakai',
+      'kapasitas',
+      'arus_maksimal_per_fasa',
+      'koordinat_penginputan_wbp',
+      'waktu_penginputan_wbp',
+      'jarak_gardu_petugas_wbp',
+      'koordinat_penginputan_lwbp',
+      'waktu_penginputan_lwbp',
       'jarak_gardu_petugas_lwbp',
     ]) {
       expect(helperSource, contains(column), reason: column);

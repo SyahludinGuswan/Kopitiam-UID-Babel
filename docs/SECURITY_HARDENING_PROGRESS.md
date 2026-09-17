@@ -1,6 +1,6 @@
 # Audit dan Progress Penguatan Sistem Kopitiam
 
-**Diperbarui:** 16 September 2026  
+**Diperbarui:** 18 September 2026
 **Repository:** `gumee08/Kopitiam`  
 **Status umum:** penguatan source berlangsung bertahap; deployment dan verifikasi produksi belum dilakukan.
 
@@ -39,6 +39,14 @@ PR #26 sudah masuk `main` melalui [commit a66a422](https://github.com/gumee08/Ko
 
 PR #27 sudah masuk `main` melalui [commit c501af1](https://github.com/gumee08/Kopitiam/commit/c501af1842f15b3b684a3a57677052c17e4e753c). Audit pascamerge memverifikasi nama database `kopitiam_local.db`, baseline schema transaksional v1, seluruh kolom Insjar/Insdu pada schema awal, serta tidak adanya mutasi schema saat repository Insjar/Insdu dibuka.
 
+## Validasi source menunggu merge
+
+| ID | Penguatan | Hasil validasi |
+|---|---|---|
+| SEC-07 | Isolasi data lokal per akun | SQLite memakai `kopitiam_account_<sha256>.db`; cache, antrean, dan foto permanen berada pada namespace akun terverifikasi. Perubahan akun menutup handle database terlebih dahulu dan data global legacy tidak dibuka. `flutter test` lulus 132 test, termasuk test isolasi akun dan Gardu. |
+
+SEC-07 dipindahkan ke tabel **Selesai di source** hanya setelah perubahan ini digabung ke `main`, CI relevan lulus, dan hasil merge diaudit. Uji pergantian akun pada perangkat nyata tetap menjadi prasyarat verifikasi produksi.
+
 ## Temuan terbuka berikutnya
 
 Prioritas P1 yang belum selesai mencakup:
@@ -46,11 +54,10 @@ Prioritas P1 yang belum selesai mencakup:
 1. SEC-04: rotasi upload key yang pernah tersimpan di source/Git history dan verifikasi secret store rilis; source remediation tersedia tetapi produksi belum tervalidasi.
 2. SEC-05: source remediation memindahkan token, profil sesi, dan status offline dari SharedPreferences ke secure storage; review, merge, dan uji perangkat nyata masih wajib.
 3. SEC-06: source Auth terpisah tersedia; provisioning, migrasi, dan penghapusan plaintext produksi masih wajib.
-4. SEC-07: source remediation menempatkan SQLite, master/cache, antrean, dan foto permanen di namespace hash akun terverifikasi. Database/folder global legacy tidak dimigrasikan otomatis dan tidak lagi dibuka karena pemiliknya tidak dapat diverifikasi; uji perangkat nyata pergantian akun masih wajib sebelum status produksi.
-5. SEC-08: satukan kebijakan penugasan, status, dan field mutable seluruh WO.
-6. SEC-10: tambahkan identitas Temuan immutable global serta verifikasi owner record existing.
-7. SEC-11: turunkan Tier, relasi aset, dan prioritas dari sumber pusat.
-8. REL-03: hentikan full-row rewrite, pertahankan formula, dan gunakan revision check.
+4. SEC-08: satukan kebijakan penugasan, status, dan field mutable seluruh WO.
+5. SEC-10: tambahkan identitas Temuan immutable global serta verifikasi owner record existing.
+6. SEC-11: turunkan Tier, relasi aset, dan prioritas dari sumber pusat.
+7. REL-03: hentikan full-row rewrite, pertahankan formula, dan gunakan revision check.
 
 Temuan P2 seperti validasi struktur JPEG, pembatasan master data, pemrosesan foto, permission iOS, dan penguatan CI/release dikerjakan setelah blocker P1 atau ketika menjadi prasyarat rilis.
 
@@ -60,11 +67,11 @@ Temuan P2 seperti validasi struktur JPEG, pembatasan master data, pemrosesan fot
 
 ### SEC-04: Signing Android
 
-Source tidak lagi menyimpan keystore, `key.properties`, atau password signing yang diobfuscate. Gradle meminta empat property signing dari file lokal yang tidak terlacak dan build release gagal tertutup bila konfigurasi tidak lengkap; CI memblokir material signing dan pola obfuscation pada source. Keystore/password yang pernah tercatat dalam riwayat harus dirotasi dan upload key Play Console diperbarui oleh administrator sebelum status produksi dapat diberikan.
+Source tidak lagi menyimpan keystore, `key.properties`, atau password signing yang diobfuscate. Gradle meminta empat property signing dari file lokal yang tidak terlacak dan build release gagal tertutup bila konfigurasi tidak lengkap. Workflow CI menjalankan `ci/check-android-signing.cjs` pada setiap push dan pull request untuk memblokir material signing terlacak atau obfuscation secret pada Gradle. Keystore/password yang pernah tercatat dalam riwayat harus dirotasi dan upload key Play Console diperbarui oleh administrator sebelum status produksi dapat diberikan.
 
 ### SEC-05: Credential storage mobile
 
-Token perangkat, profil sesi, dan metadata masa berlaku login offline disimpan melalui `flutter_secure_storage`. `SharedPreferences` hanya menghapus key sesi lama saat bootstrap dan tidak boleh membaca atau menulis credential maupun profil sesi. Pengujian perangkat nyata tetap wajib untuk memverifikasi migrasi dari instalasi yang telah memiliki sesi lama serta perilaku logout dan masa berlaku offline.
+Token perangkat, profil sesi, dan metadata masa berlaku login offline disimpan melalui `flutter_secure_storage`. `SharedPreferences` hanya menghapus key sesi lama saat bootstrap dan tidak boleh membaca atau menulis credential maupun profil sesi. Android menonaktifkan backup aplikasi agar storage terenkripsi tidak ikut dipulihkan lintas perangkat. Logout eksplisit maupun aksi login ulang setelah sesi ditolak mencabut token perangkat saat jaringan tersedia dan selalu menghapus kredensial lokal. Pengujian perangkat nyata tetap wajib untuk memverifikasi migrasi dari instalasi yang telah memiliki sesi lama serta perilaku logout dan masa berlaku offline.
 
 ## Tahap produksi yang masih wajib
 

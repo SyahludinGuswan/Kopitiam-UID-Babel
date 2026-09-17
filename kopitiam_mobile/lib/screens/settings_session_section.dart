@@ -36,7 +36,9 @@ class _SettingsSessionSectionState extends State<SettingsSessionSection> {
       const Duration(minutes: 1),
       (_) => _enforceOfflineExpiry(),
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) => _enforceOfflineExpiry());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _enforceOfflineExpiry(),
+    );
   }
 
   @override
@@ -46,7 +48,8 @@ class _SettingsSessionSectionState extends State<SettingsSessionSection> {
   }
 
   Future<void> _enforceOfflineExpiry() async {
-    if (!mounted || !LocalAuthService.offlineSessionExpired(widget.session)) return;
+    if (!mounted || !LocalAuthService.offlineSessionExpired(widget.session))
+      return;
     await _clear();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
@@ -76,7 +79,11 @@ class _SettingsSessionSectionState extends State<SettingsSessionSection> {
     if (ok != true || !mounted) return;
     setState(() => _loggingOut = true);
     try {
-      await ApiService.logoutPerangkat(token: '${widget.session['token'] ?? ''}');
+      await ApiService.logoutPerangkat(
+        token: '${widget.session['token'] ?? ''}',
+      );
+    } catch (_) {
+      // Sesi lokal tetap harus dihentikan jika perangkat sedang offline.
     } finally {
       await _clear();
     }
@@ -107,9 +114,18 @@ class _SettingsSessionSectionState extends State<SettingsSessionSection> {
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.manage_accounts_rounded, color: Color(0xFF004D8C)),
+                    Icon(
+                      Icons.manage_accounts_rounded,
+                      color: Color(0xFF004D8C),
+                    ),
                     SizedBox(width: 10),
-                    Text('Akun & Sesi', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                    Text(
+                      'Akun & Sesi',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 8),

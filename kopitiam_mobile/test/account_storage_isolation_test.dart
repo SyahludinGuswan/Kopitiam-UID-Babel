@@ -23,15 +23,21 @@ void main() {
   });
 
   test('database, foto, dan lifecycle memakai namespace akun', () {
-    final storage = File('lib/services/local_account_storage.dart').readAsStringSync();
+    final storage = File('lib/services/local_account_storage.dart')
+        .readAsStringSync();
     final sqlite = File('lib/services/sqlite_service.dart').readAsStringSync();
-    final bootstrap =
-        File('lib/services/session_bootstrap_service.dart').readAsStringSync();
-    final login =
-        File('lib/screens/widgets/login_sheet.dart').readAsStringSync();
+    final bootstrap = File('lib/services/session_bootstrap_service.dart')
+        .readAsStringSync();
+    final login = File('lib/screens/widgets/login_sheet.dart')
+        .readAsStringSync();
 
-    expect(storage, contains("p.join(root.path, _accountsDirectory, namespace)"));
-    expect(storage, contains("p.join(root, _accountsDirectory, namespace)"));
+    expect(
+      storage,
+      contains("p.join(root.path, _accountsDirectory, namespace)"),
+    );
+    expect(storage, contains("_databasePrefix = 'kopitiam_account_'"));
+    expect(storage, contains(r"'$_databasePrefix$namespace.db'"));
+    expect(storage, isNot(contains('kopitiam_local.db')));
     expect(sqlite, contains('clearActiveAccount'));
     expect(bootstrap, contains('SqliteService.instance.activateForProfile'));
     expect(bootstrap, contains('SqliteService.instance.clearActiveAccount'));

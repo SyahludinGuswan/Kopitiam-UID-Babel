@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models/temuan_inspeksi.dart';
 import '../models/wo_insjar.dart';
+import '../services/api_service.dart';
 import '../services/session_bootstrap_service.dart';
 import '../services/temuan_repository.dart';
 import 'login_screen.dart';
@@ -83,10 +84,7 @@ class _TemuanTabState extends State<TemuanTab>
     final changed = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) => WoTemuanFormScreen(
-          wo: widget.wo,
-          sesi: widget.sesi,
-        ),
+        builder: (_) => WoTemuanFormScreen(wo: widget.wo, sesi: widget.sesi),
       ),
     );
     if (changed == true) await _load();
@@ -163,7 +161,15 @@ class _TemuanTabState extends State<TemuanTab>
   }
 
   Future<void> _logoutSession() async {
-    await SessionBootstrapService.clearSession();
+    try {
+      await ApiService.logoutPerangkat(
+        token: '${widget.sesi['token'] ?? ''}',
+      );
+    } catch (_) {
+      // Sesi lokal sudah ditolak; jangan menahan pengguna pada UI lama.
+    } finally {
+      await SessionBootstrapService.clearSession();
+    }
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
@@ -244,92 +250,86 @@ class _TemuanTabState extends State<TemuanTab>
   }
 
   Widget _card(TemuanInspeksi item) => Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: line),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: line),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    item.kodeTemuan,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: blue,
-                    ),
-                  ),
+            Expanded(
+              child: Text(
+                item.kodeTemuan,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: blue,
                 ),
-                Text(
-                  item.prioritas,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
+              ),
             ),
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _thumb(item.fotoTemuan),
-                const SizedBox(width: 8),
-                _thumb(item.fotoLingkungan),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.temuan,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: navy,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${item.tier} • ${item.segmen}',
-                        style: const TextStyle(color: muted, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Icon(
-                  item.dirty
-                      ? Icons.cloud_upload_outlined
-                      : Icons.cloud_done_outlined,
-                  size: 13,
-                  color: item.dirty ? amber : green,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  item.dirty ? 'Belum sinkron' : 'Tersinkron',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: item.dirty ? amber : green,
-                  ),
-                ),
-              ],
+            Text(
+              item.prioritas,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
             ),
           ],
         ),
-      );
+        const SizedBox(height: 10),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _thumb(item.fotoTemuan),
+            const SizedBox(width: 8),
+            _thumb(item.fotoLingkungan),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.temuan,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: navy,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${item.tier} • ${item.segmen}',
+                    style: const TextStyle(color: muted, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Icon(
+              item.dirty
+                  ? Icons.cloud_upload_outlined
+                  : Icons.cloud_done_outlined,
+              size: 13,
+              color: item.dirty ? amber : green,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              item.dirty ? 'Belum sinkron' : 'Tersinkron',
+              style: TextStyle(fontSize: 10, color: item.dirty ? amber : green),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
 
   void _showImage(String path) {
     showDialog<void>(

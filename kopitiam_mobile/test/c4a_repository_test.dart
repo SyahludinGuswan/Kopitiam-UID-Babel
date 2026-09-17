@@ -36,36 +36,52 @@ void main() {
       expect(recovered.syncError, 'timeout');
     });
 
-    test('repository exposes query, durable queue, validation and retry service', () {
-      final source = File('lib/services/temuan_repository.dart').readAsStringSync();
-      expect(source, contains('Future<List<TemuanInspeksi>> daftarC4a'));
-      expect(source, contains("kode_wo = '' AND is_dirty = 1"));
-      expect(source, contains('validateC4a(item)'));
-      expect(source, contains('Future<C4aSyncResult> sinkronC4a'));
-      expect(source, contains('Future<bool> kirimUlangC4a'));
-      expect(source, contains('class C4aSyncService'));
-      expect(source, contains("..['Kode WO'] = ''"));
-      expect(source, contains("..['Jenis WO'] = ''"));
-    });
+    test(
+      'repository exposes query, durable queue, validation and retry service',
+      () {
+        final source = File('lib/services/temuan_repository.dart')
+            .readAsStringSync();
+        expect(source, contains('Future<List<TemuanInspeksi>> daftarC4a'));
+        expect(source, contains("kode_wo = '' AND is_dirty = 1"));
+        expect(source, contains('validateC4a(item)'));
+        expect(source, contains('Future<C4aSyncResult> sinkronC4a'));
+        expect(source, contains('Future<bool> kirimUlangC4a'));
+        expect(source, contains('class C4aSyncService'));
+        expect(source, contains("..['Kode WO'] = ''"));
+        expect(source, contains("..['Jenis WO'] = ''"));
+      },
+    );
 
-    test('dashboard provides local list, sync button, failed retry and FAB', () {
-      final source = File('lib/screens/dashboard_unified.dart').readAsStringSync();
-      expect(source, contains('class C4aFindingsHome'));
-      expect(source, contains("label: const Text('Sinkron')"));
-      expect(source, contains("label: const Text('Kirim ulang')"));
-      expect(source, contains('floatingActionButton: FloatingActionButton'));
-      expect(source, contains('TemuanFormScreen.c4a'));
-    });
+    test(
+      'dashboard provides local list, sync button, failed retry and FAB',
+      () {
+        final source = File('lib/screens/dashboard_unified.dart')
+            .readAsStringSync();
+        expect(source, contains('class C4aFindingsHome'));
+        expect(source, contains("label: const Text('Sinkron')"));
+        expect(source, contains("label: const Text('Kirim ulang')"));
+        expect(source, contains('floatingActionButton: FloatingActionButton'));
+        expect(source, contains('TemuanFormScreen.c4a'));
+      },
+    );
 
     test('clean Kopitiam baseline includes queue and Gardu fields', () {
-      final source = File('lib/services/sqlite_service.dart').readAsStringSync();
-      final helper = File('lib/services/database_helper.dart').readAsStringSync();
-      final storage = File('lib/services/local_account_storage.dart').readAsStringSync();
-      expect(storage, contains("legacyDatabaseName = 'kopitiam_local.db'"));
+      final source = File('lib/services/sqlite_service.dart')
+          .readAsStringSync();
+      final helper = File('lib/services/database_helper.dart')
+          .readAsStringSync();
+      final storage = File('lib/services/local_account_storage.dart')
+          .readAsStringSync();
+      expect(storage, contains("_databasePrefix = 'kopitiam_account_'"));
       expect(storage, contains("_accountsDirectory = 'kopitiam_accounts'"));
       expect(source, contains('databaseVersion = 1'));
       expect(source, isNot(contains('onUpgrade:')));
-      for (final column in ['sync_status', 'sync_error', 'retry_count', 'last_attempt_at']) {
+      for (final column in [
+        'sync_status',
+        'sync_error',
+        'retry_count',
+        'last_attempt_at',
+      ]) {
         expect(source, contains(column));
       }
       for (final column in [

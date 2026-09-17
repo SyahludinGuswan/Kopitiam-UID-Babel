@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:sqflite/sqflite.dart';
 
 /// Menentukan root lokal hanya dari identitas akun yang telah diverifikasi.
 /// Data global legacy sengaja tidak dirujuk karena pemiliknya tidak dapat
@@ -12,7 +13,7 @@ class LocalAccountStorage {
   LocalAccountStorage._();
 
   static final LocalAccountStorage instance = LocalAccountStorage._();
-  static const legacyDatabaseName = 'kopitiam_local.db';
+  static const _databasePrefix = 'kopitiam_account_';
   static const _accountsDirectory = 'kopitiam_accounts';
 
   String? _namespace;
@@ -59,10 +60,10 @@ class LocalAccountStorage {
     return directory;
   }
 
+  String get databaseName => '$_databasePrefix$namespace.db';
+
   Future<String> databasePath() async {
     final root = await getDatabasesPath();
-    final directory = Directory(p.join(root, _accountsDirectory, namespace));
-    await directory.create(recursive: true);
-    return p.join(directory.path, legacyDatabaseName);
+    return p.join(root, databaseName);
   }
 }

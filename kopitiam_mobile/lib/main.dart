@@ -20,13 +20,13 @@ class KopitiamApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-        navigatorKey: appNavigatorKey,
-        title: 'Kopitiam',
-        debugShowCheckedModeBanner: false,
-        theme: KopitiamTheme.light,
-        home: const StartupScreen(),
-        builder: (context, child) => _SessionGuard(child: child!),
-      );
+    navigatorKey: appNavigatorKey,
+    title: 'Kopitiam',
+    debugShowCheckedModeBanner: false,
+    theme: KopitiamTheme.light,
+    home: const StartupScreen(),
+    builder: (context, child) => _SessionGuard(child: child!),
+  );
 }
 
 class _SessionGuard extends StatefulWidget {
@@ -115,20 +115,17 @@ class _SessionGuardState extends State<_SessionGuard>
 
   @override
   Widget build(BuildContext context) => Stack(
-        children: [
-          AbsorbPointer(
-            absorbing: _mockLocationBlocked,
-            child: widget.child,
-          ),
-          if (_mockLocationBlocked)
-            Positioned(
-              left: 20,
-              right: 20,
-              top: MediaQuery.paddingOf(context).top + 72,
-              child: _MockLocationWarning(onRetry: _securityCheck),
-            ),
-        ],
-      );
+    children: [
+      AbsorbPointer(absorbing: _mockLocationBlocked, child: widget.child),
+      if (_mockLocationBlocked)
+        Positioned(
+          left: 20,
+          right: 20,
+          top: MediaQuery.paddingOf(context).top + 72,
+          child: _MockLocationWarning(onRetry: _securityCheck),
+        ),
+    ],
+  );
 }
 
 class _MockLocationWarning extends StatelessWidget {
@@ -138,73 +135,73 @@ class _MockLocationWarning extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-        color: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(18, 16, 14, 14),
-          decoration: BoxDecoration(
-            color: KopitiamColors.dangerSoft,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE7AAB0)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x26071F33),
-                blurRadius: 24,
-                offset: Offset(0, 10),
-              ),
-            ],
+    color: Colors.transparent,
+    child: Container(
+      padding: const EdgeInsets.fromLTRB(18, 16, 14, 14),
+      decoration: BoxDecoration(
+        color: KopitiamColors.dangerSoft,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE7AAB0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x26071F33),
+            blurRadius: 24,
+            offset: Offset(0, 10),
           ),
-          child: Column(
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.gps_off_rounded,
-                    color: KopitiamColors.danger,
-                    size: 28,
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Lokasi tiruan terdeteksi',
-                          style: TextStyle(
-                            color: KopitiamColors.ink,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        SizedBox(height: 5),
-                        Text(
-                          'Sesi dihentikan. Matikan aplikasi pengubah lokasi sebelum masuk kembali.',
-                          style: TextStyle(
-                            color: KopitiamColors.muted,
-                            height: 1.4,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              Icon(
+                Icons.gps_off_rounded,
+                color: KopitiamColors.danger,
+                size: 28,
               ),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton.icon(
-                  onPressed: onRetry,
-                  icon: const Icon(Icons.refresh_rounded, size: 18),
-                  label: const Text('Periksa ulang'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: KopitiamColors.danger,
-                  ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Lokasi tiruan terdeteksi',
+                      style: TextStyle(
+                        color: KopitiamColors.ink,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 5),
+                    Text(
+                      'Sesi dihentikan. Matikan aplikasi pengubah lokasi sebelum masuk kembali.',
+                      style: TextStyle(
+                        color: KopitiamColors.muted,
+                        height: 1.4,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-        ),
-      );
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Periksa ulang'),
+              style: FilledButton.styleFrom(
+                backgroundColor: KopitiamColors.danger,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }

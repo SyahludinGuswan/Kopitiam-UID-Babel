@@ -1,0 +1,19 @@
+name: Android Signing Guard
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  signing-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Reject tracked Android signing material
+        run: node ci/check-android-signing.cjs

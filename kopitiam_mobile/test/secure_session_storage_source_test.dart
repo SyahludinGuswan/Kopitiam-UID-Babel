@@ -16,6 +16,13 @@ void main() {
     final localAuth = File(
       'lib/services/local_auth_service.dart',
     ).readAsStringSync();
+    final settings = File(
+      'lib/screens/settings_session_section.dart',
+    ).readAsStringSync();
+    final temuanTab = File('lib/screens/temuan_tab.dart').readAsStringSync();
+    final manifest = File(
+      'android/app/src/main/AndroidManifest.xml',
+    ).readAsStringSync();
 
     expect(login, isNot(contains('SharedPreferences')));
     expect(main, isNot(contains('SharedPreferences')));
@@ -24,5 +31,11 @@ void main() {
     expect(deviceSession, contains('FlutterSecureStorage'));
     expect(api, contains('DeviceSessionService.save'));
     expect(localAuth, contains('FlutterSecureStorage'));
+    expect(temuanTab, contains('ApiService.logoutPerangkat'));
+    expect(temuanTab, contains('SessionBootstrapService.clearSession'));
+    expect(settings, contains('ApiService.logoutPerangkat'));
+    expect(settings, contains('await _clear()'));
+    expect(manifest, contains('android:allowBackup="false"'));
+    expect(manifest, contains('android:fullBackupContent="false"'));
   });
 }
