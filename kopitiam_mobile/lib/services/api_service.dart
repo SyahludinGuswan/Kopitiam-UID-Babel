@@ -164,6 +164,9 @@ class ApiService {
     final device = await DeviceSessionService.deviceName();
     final response = await _postMap({'action': 'loginPerangkat', 'username': username, 'password': password, 'perangkat': device});
     if (response['success'] == true && response['deviceToken'] != null) {
+      if (DeviceSessionService.normalizeUsername(response['username']) != DeviceSessionService.normalizeUsername(username)) {
+        throw StateError('Identitas akun hasil verifikasi server tidak cocok.');
+      }
       response['roleVerifiedOnline'] = true; response['offlineLogin'] = false;
       await DeviceSessionService.save(deviceToken: response['deviceToken'].toString(), profile: response);
     }

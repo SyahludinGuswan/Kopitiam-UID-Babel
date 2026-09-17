@@ -3,7 +3,6 @@ import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// Kredensial offline hanya berlaku 24 jam sejak login online terakhir dan
 /// hanya untuk akun yang sama. Akun berbeda wajib diverifikasi online.
@@ -14,6 +13,8 @@ class LocalAuthService {
   static const _saltKey = 'local_auth_password_salt';
   static const _sessionKey = 'local_auth_session_json';
   static const _verifiedAtKey = 'local_auth_verified_at';
+  static const _offlineLoginKey = 'local_auth_offline_login';
+  static const _offlineExpiresAtKey = 'local_auth_offline_expires_at';
   static const offlineValidity = Duration(days: 1);
 
   static String normalizeUsername(Object? value) =>
@@ -47,9 +48,7 @@ class LocalAuthService {
       key: _verifiedAtKey,
       value: verifiedAt.toIso8601String(),
     );
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('offlineLogin');
-    await prefs.remove('offlineExpiresAt');
+    await clearOfflineStatus();
   }
 
   static Future<Map<String, dynamic>?> verifyOffline({
@@ -87,9 +86,7 @@ class LocalAuthService {
           ..['roleVerifiedOnline'] = false
           ..['offlineLogin'] = true
           ..['offlineExpiresAt'] = expiresAt;
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('offlineLogin', true);
-        await prefs.setString('offlineExpiresAt', expiresAt);
+        await markOfflineUntil(DateTime.parse(expiresAt));
         return session;
       }
     } catch (_) {}
@@ -104,6 +101,27 @@ class LocalAuthService {
     return expiresAt == null || !DateTime.now().toUtc().isBefore(expiresAt);
   }
 
+  static Future<bool> storedOfflineSessionExpired() async {
+    if (await _storage.read(key: _offlineLoginKey) != 'true') return false;
+    final expiresAt = DateTime.tryParse(
+      await _storage.read(key: _offlineExpiresAtKey) ?? '',
+    )?.toUtc();
+    return expiresAt == null || !DateTime.now().toUtc().isBefore(expiresAt);
+  }
+
+  static Future<void> markOfflineUntil(DateTime expiresAt) async {
+    await _storage.write(key: _offlineLoginKey, value: 'true');
+    await _storage.write(
+      key: _offlineExpiresAtKey,
+      value: expiresAt.toUtc().toIso8601String(),
+    );
+  }
+
+  static Future<void> clearOfflineStatus() async {
+    await _storage.delete(key: _offlineLoginKey);
+    await _storage.delete(key: _offlineExpiresAtKey);
+  }
+
   static Future<void> clear() async {
     for (final key in [
       _usernameKey,
@@ -114,9 +132,7 @@ class LocalAuthService {
     ]) {
       await _storage.delete(key: key);
     }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('offlineLogin');
-    await prefs.remove('offlineExpiresAt');
+    await clearOfflineStatus();
   }
 
   static String _hash(String password, String salt) {

@@ -1,4 +1,3 @@
-import java.util.Base64
 import java.util.Properties
 
 plugins {
@@ -15,22 +14,19 @@ val isReleaseTask = gradle.startParameter.taskNames.any {
     it.contains("release", ignoreCase = true)
 }
 
-// Sandi keystore tidak disimpan dalam bentuk teks polos. Nilai di bawah adalah
-// hasil obfuscation (bukan enkripsi) sehingga tidak terbaca langsung di repo.
-// PERHATIAN: ini hanya menyamarkan, bukan mengamankan. Repo wajib tetap privat.
-val obfuscatedSecretPart1 = "RUJkb0hqWXBIZ3MyYnpJWEhCd3pGajBNTkc0Z0"
-val obfuscatedSecretPart2 = "xCWnRPVEJwUHcwNE1od0tJeTQ1SFJBUllnPT0="
-
-fun unobfuscateSecret(value: String): String {
-    val inner = String(
-        Base64.getDecoder().decode(value.trim()),
-        Charsets.UTF_8,
+if (isReleaseTask && !keystorePropertiesFile.exists()) {
+    throw GradleException(
+        "Release signing Kopitiam belum dikonfigurasi. " +
+            "Ambil secret dari secret store lalu buat android/key.properties dan keystore release lokal."
     )
-    val xored = Base64.getDecoder().decode(inner)
-    val plain = ByteArray(xored.size) { index ->
-        (xored[index].toInt() xor 0x5A).toByte()
+}
+
+fun requiredReleaseSigningProperty(name: String): String {
+    val value = keystoreProperties.getProperty(name)?.trim()
+    if (value.isNullOrEmpty()) {
+        throw GradleException("$name wajib diisi pada android/key.properties untuk build release.")
     }
-    return String(plain, Charsets.UTF_8)
+    return value
 }
 
 android {
@@ -53,25 +49,22 @@ android {
 
     signingConfigs {
         create("release") {
-            if (keystorePropertiesFile.exists()) {
-                val storeFilePath = keystoreProperties.getProperty("storeFile")
-                    ?: error("storeFile belum diisi pada android/key.properties")
-                storeFile = rootProject.file(storeFilePath)
-                storePassword = unobfuscateSecret(
-                    obfuscatedSecretPart1 + obfuscatedSecretPart2,
-                )
-                keyAlias = keystoreProperties.getProperty("keyAlias")
-                    ?: error("keyAlias belum diisi pada android/key.properties")
-                keyPassword = unobfuscateSecret(
-                    obfuscatedSecretPart1 + obfuscatedSecretPart2,
-                )
+            if (isReleaseTask) {
+                val configuredStoreFile = rootProject.file(requiredReleaseSigningProperty("storeFile"))
+                if (!configuredStoreFile.isFile) {
+                    throw GradleException("Keystore release tidak ditemukan pada: ${configuredStoreFile.path}")
+                }
+                storeFile = configuredStoreFile
+                storePassword = requiredReleaseSigningProperty("storePassword")
+                keyAlias = requiredReleaseSigningProperty("keyAlias")
+                keyPassword = requiredReleaseSigningProperty("keyPassword")
             }
         }
     }
 
     buildTypes {
         release {
-            if (keystorePropertiesFile.exists()) {
+            if (isReleaseTask) {
                 signingConfig = signingConfigs.getByName("release")
             }
             isMinifyEnabled = true
@@ -82,13 +75,6 @@ android {
             )
         }
     }
-}
-
-if (isReleaseTask && !keystorePropertiesFile.exists()) {
-    throw GradleException(
-        "Release signing Kopitiam belum dikonfigurasi. " +
-            "Buat android/key.properties dan keystore release."
-    )
 }
 
 kotlin {

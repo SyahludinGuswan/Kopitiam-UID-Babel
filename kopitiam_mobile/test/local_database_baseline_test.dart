@@ -9,7 +9,10 @@ void main() {
   final insduSource = File('lib/services/wo_insdu_repository.dart').readAsStringSync();
 
   test('local database uses a clean Kopitiam baseline', () {
-    expect(sqliteSource, contains("databaseName = 'kopitiam_local.db'"));
+    final storageSource = File('lib/services/local_account_storage.dart').readAsStringSync();
+    expect(storageSource, contains("legacyDatabaseName = 'kopitiam_local.db'"));
+    expect(storageSource, contains("_accountsDirectory = 'kopitiam_accounts'"));
+    expect(sqliteSource, contains('LocalAccountStorage'));
     expect(sqliteSource, contains('databaseVersion = 1'));
     expect(sqliteSource, isNot(contains('simandist_local.db')));
     expect(sqliteSource, isNot(contains('onUpgrade:')));

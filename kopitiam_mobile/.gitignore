@@ -44,5 +44,20 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Android release signing material must never be committed.
+/android/key.properties
+/android/*.jks
+/android/*.keystore
+/android/*.p12
+/android/*.pfx
+/android/*.pem
+/android/*.der
+/android/app/*.jks
+/android/app/*.keystore
+/android/app/*.p12
+/android/app/*.pfx
+/android/app/*.pem
+/android/app/*.der
+
 # Widget Preview related
 .widget_preview/

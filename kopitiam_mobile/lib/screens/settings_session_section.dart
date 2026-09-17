@@ -1,11 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api_service.dart';
-import '../services/device_session_service.dart';
 import '../services/local_auth_service.dart';
+import '../services/session_bootstrap_service.dart';
 import '../theme/kopitiam_theme.dart';
 import 'login_screen.dart';
 import 'widgets/master_data_accordion.dart';
@@ -78,8 +77,6 @@ class _SettingsSessionSectionState extends State<SettingsSessionSection> {
     setState(() => _loggingOut = true);
     try {
       await ApiService.logoutPerangkat(token: '${widget.session['token'] ?? ''}');
-    } catch (_) {
-      await DeviceSessionService.clear();
     } finally {
       await _clear();
     }
@@ -91,9 +88,7 @@ class _SettingsSessionSectionState extends State<SettingsSessionSection> {
   }
 
   Future<void> _clear() async {
-    await DeviceSessionService.clear();
-    await LocalAuthService.clear();
-    await (await SharedPreferences.getInstance()).clear();
+    await SessionBootstrapService.clearSession();
   }
 
   @override

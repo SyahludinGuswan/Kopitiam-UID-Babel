@@ -107,7 +107,7 @@ function mockSetupSheet(name, rows = []) {
 }
 
 function loadBackendSetup() {
-  const loaded = loadSetup({ PASSWORD_PEPPER: "keep-me", device_corrupt: "{bad-json" });
+  const loaded = loadSetup({ device_corrupt: "{bad-json" });
   const { backend } = loaded;
   const root = path.resolve(__dirname, "..");
   // Muat source GAS asli, bukan stub setup/validator/header helper.
@@ -126,7 +126,7 @@ function loadBackendSetup() {
   }
   const userHeaders = [
     "No", "Kode UIW", "Kode UP3", "Kode ULP", "ULP", "Username",
-    "Password", "Role", "Bidang", "Tim", "Sub-Tim", "Akses Menu",
+    "Role", "Bidang", "Tim", "Sub-Tim", "Akses Menu",
   ];
   sheets.get(config.SPREADSHEET_ID).set(config.USERS_SHEET,
     mockSetupSheet(config.USERS_SHEET, [userHeaders, userHeaders.map((_, i) => `user-${i}`)]));
@@ -211,7 +211,6 @@ for (const state of ["missing", "empty"]) {
     assert.equal(env.snapshot(), beforeRerun);
     assert.equal(env.triggers.length, 1);
     assert.equal(env.triggers[0].getHandlerFunction(), backend.DEVICE_CLEANUP_HANDLER);
-    assert.equal(env.properties.get("PASSWORD_PEPPER"), "keep-me");
     assert.deepEqual(env.lockCounts(), [2, 2]);
     assert.equal(env.driveCalls(), 2);
     assert.deepEqual(env.opened, [
@@ -251,11 +250,12 @@ test("setupBackend rejects incomplete existing headers without overwriting any s
   assert.deepEqual(env.lockCounts(), [0, 0]);
 });
 
-test("setup matches the active backend schema and avoids legacy session APIs", () => {
+test("setup matches the password-free operational schema", () => {
   assert.match(source, /CONFIG\.SPREADSHEET_ID/);
   assert.match(source, /CONFIG\.WO_SPREADSHEET_ID/);
   assert.match(source, /CONFIG\.TEMUAN_SPREADSHEET_ID/);
   assert.match(source, /"Kode UIW"[\s\S]*"Akses Menu"/);
+  assert.doesNotMatch(source, /"Password"/);
   assert.doesNotMatch(source, /CONFIG\.SESSIONS_SHEET/);
   assert.doesNotMatch(source, /hashPassword_|getSheet_/);
 });
@@ -270,7 +270,6 @@ test("server cleanup removes expired, idle, future, and corrupt device tokens", 
   const day = 24 * 60 * 60 * 1000;
   const now = Date.UTC(2026, 7, 28, 3, 0, 0);
   const records = {
-    PASSWORD_PEPPER: "keep-me",
     device_active: JSON.stringify({
       createdAt: now - day,
       lastUsedAt: now - 1000,
@@ -295,7 +294,6 @@ test("server cleanup removes expired, idle, future, and corrupt device tokens", 
   assert.equal(result.dihapus, 4);
   assert.equal(result.aktif, 1);
   assert.ok(properties.has("device_active"));
-  assert.ok(properties.has("PASSWORD_PEPPER"));
   assert.equal(properties.has("device_expired"), false);
   assert.equal(properties.has("device_idle"), false);
   assert.equal(properties.has("device_future"), false);

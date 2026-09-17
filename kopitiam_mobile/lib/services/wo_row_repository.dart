@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../models/temuan_inspeksi.dart';
@@ -87,7 +86,7 @@ class WoRowRepository {
     if (length <= 0 || length > maxPhotoBytes) throw StateError('Ukuran foto harus lebih kecil dari 5 MB.');
     final header = await source.openRead(0, 3).fold<List<int>>(<int>[], (bytes, chunk) => bytes..addAll(chunk));
     if (header.length < 3 || header[0] != 0xFF || header[1] != 0xD8 || header[2] != 0xFF) throw StateError('Format foto tidak valid. Gunakan kamera aplikasi.');
-    final root = await getApplicationDocumentsDirectory();
+    final root = await _db.accountDocumentsDirectory();
     final folder = Directory(p.join(root.path, 'row_photos', _safeName(kodeWo)));
     await folder.create(recursive: true);
     final stamp = DateTime.now().toIso8601String().replaceAll(RegExp(r'[^0-9]'), '').substring(8, 14);

@@ -4,8 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models/temuan_inspeksi.dart';
 import '../models/wo_insjar.dart';
-import '../services/device_session_service.dart';
-import '../services/local_auth_service.dart';
+import '../services/session_bootstrap_service.dart';
 import '../services/temuan_repository.dart';
 import 'login_screen.dart';
 import 'wo_temuan_form_screen.dart';
@@ -164,8 +163,7 @@ class _TemuanTabState extends State<TemuanTab>
   }
 
   Future<void> _logoutSession() async {
-    await DeviceSessionService.clear();
-    await LocalAuthService.clear();
+    await SessionBootstrapService.clearSession();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const LoginScreen()),

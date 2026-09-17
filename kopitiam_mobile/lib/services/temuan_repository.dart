@@ -4,7 +4,6 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import '../models/c4a_selection.dart';
 import '../models/temuan_inspeksi.dart';
@@ -99,7 +98,7 @@ class TemuanRepository {
   }
   Future<File> _persistPhoto(String sourcePath, String code, String label) async {
     final source = File(sourcePath); await _validatePhoto(source);
-    final root = await getApplicationDocumentsDirectory(), folder = Directory(p.join(root.path, 'temuan_photos', _safeName(code))); await folder.create(recursive: true);
+    final root = await _db.accountDocumentsDirectory(), folder = Directory(p.join(root.path, 'temuan_photos', _safeName(code))); await folder.create(recursive: true);
     final match = RegExp(r'(\d{6})(?=\.jpe?g$)', caseSensitive: false).firstMatch(p.basename(source.path));
     final stamp = match?.group(1) ?? DateTime.now().toIso8601String().replaceAll(RegExp(r'[^0-9]'), '').substring(8, 14);
     final destination = File(p.join(folder.path, '${_safeName(code)}.$label.$stamp.jpg'));

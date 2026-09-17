@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../models/wo_har_du.dart';
@@ -63,7 +62,7 @@ class WoHarDuRepository {
   Future<void> simpanSelesai(WoHarDu source, {required String fotoSesudah, required String koordinat, required double latitude, required double longitude, required String catatan, required String username}) async {
     final photo = File(fotoSesudah);
     if (!await photo.exists()) throw StateError('Foto Sesudah wajib diambil.');
-    final root = await getApplicationDocumentsDirectory();
+    final root = await _db.accountDocumentsDirectory();
     final folder = Directory(p.join(root.path, 'har_du_photos', _safe(source.kodeWo)));
     await folder.create(recursive: true);
     final storedPhoto = await photo.copy(p.join(folder.path, '${_safe(source.kodeWo)}.${DateTime.now().millisecondsSinceEpoch}.jpg'));

@@ -21,7 +21,6 @@ function loadCentralRole(role) {
     "16140",
     "ULP Koba",
     "pegawai",
-    "password",
     role,
     "",
     "",

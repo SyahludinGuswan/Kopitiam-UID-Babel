@@ -1,24 +1,38 @@
-import 'dart:convert';
+import 'dart:io';
 
-import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
 import '../models/local_user.dart';
 import 'database_helper.dart';
+import 'local_account_storage.dart';
 
 class SqliteService {
   SqliteService._();
   static final SqliteService instance = SqliteService._();
-  static const databaseName = 'kopitiam_local.db';
   static const databaseVersion = 1;
   static const masterDatasets = ['User_App_Mobile','Master_Penyulang','Master_Keypoint','Master_Temuan','Jenis Pohon','Master_Material','Master_Pekerjaan_Har','Master_Gardu'];
   Database? _database;
+  final LocalAccountStorage _storage = LocalAccountStorage.instance;
+
+  Future<void> activateForProfile(Map<String, dynamic> profile) =>
+      activate(profile['username']);
+
+  /// Menutup database akun sebelumnya sebelum akun baru dapat mengakses data.
+  Future<void> activate(Object? username) async {
+    final namespace = LocalAccountStorage.namespaceForUsername(username);
+    if (_storage.activeNamespace == namespace) return;
+    await close();
+    await _storage.activate(username);
+  }
+
+  Future<Directory> accountDocumentsDirectory() async {
+    return _storage.documentsDirectory();
+  }
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    final root = await getDatabasesPath();
     _database = await openDatabase(
-      p.join(root, databaseName),
+      await _storage.databasePath(),
       version: databaseVersion,
       onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: (db, version) async => _createSchema(db),
@@ -157,6 +171,13 @@ class SqliteService {
   Future<void> close() async {
     await _database?.close();
     _database = null;
+  }
+
+  /// Menutup handle dan menghapus pilihan akun dari memori, tanpa menghapus
+  /// antrean offline milik akun tersebut.
+  Future<void> clearActiveAccount() async {
+    await close();
+    await _storage.clearActiveAccount();
   }
 
   LocalUser _fromMap(Map<String, Object?> row) => LocalUser(

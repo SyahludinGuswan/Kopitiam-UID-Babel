@@ -3,9 +3,9 @@ name: Flutter CI
 on:
   push:
     branches: [main]
-    paths: ['kopitiam_mobile/**', '.github/workflows/flutter-ci.yml']
+    paths: ['kopitiam_mobile/**', 'ci/check-android-signing.cjs', '.github/workflows/flutter-ci.yml']
   pull_request:
-    paths: ['kopitiam_mobile/**', '.github/workflows/flutter-ci.yml']
+    paths: ['kopitiam_mobile/**', 'ci/check-android-signing.cjs', '.github/workflows/flutter-ci.yml']
 
 permissions:
   contents: read
@@ -19,6 +19,10 @@ jobs:
         working-directory: kopitiam_mobile
     steps:
       - uses: actions/checkout@v4
+
+      - name: Block tracked Android signing material
+        working-directory: .
+        run: node ci/check-android-signing.cjs
 
       - uses: subosito/flutter-action@v2
         with:

@@ -2,10 +2,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_service.dart';
 import 'device_session_service.dart';
+import 'local_auth_service.dart';
 import 'role_provider.dart';
+import 'sqlite_service.dart';
 
 class SessionBootstrapService {
-  static const sessionKeys = [
+  static const _legacySessionKeys = [
     'token',
     'deviceToken',
     'username',
@@ -22,14 +24,14 @@ class SessionBootstrapService {
   ];
 
   static Future<Map<String, dynamic>?> restore() async {
+    await clearLegacyPreferences();
     final deviceToken = await DeviceSessionService.token();
     if (deviceToken.isEmpty) return null;
 
     try {
       final result = await ApiService.cekPerangkat();
       if (result['success'] != true) {
-        await clearPreferencesOnly();
-        await DeviceSessionService.clear();
+        await clearSession();
         return null;
       }
       var session = RoleProvider.markOnline(Map<String, dynamic>.from(result));
@@ -38,7 +40,8 @@ class SessionBootstrapService {
         deviceToken: (session['deviceToken'] ?? deviceToken).toString(),
         profile: session,
       );
-      await _savePreferences(session);
+      await SqliteService.instance.activateForProfile(session);
+      await LocalAuthService.clearOfflineStatus();
       return session;
     } catch (_) {
       final cached = await DeviceSessionService.profile();
@@ -51,37 +54,31 @@ class SessionBootstrapService {
           verifiedAt == null ||
           now.isBefore(verifiedAt) ||
           now.difference(verifiedAt) >= const Duration(days: 1)) {
+        await clearSession();
         return null;
       }
       final session = RoleProvider.markOffline(cached, verifiedAt);
-      await _savePreferences(session);
+      await SqliteService.instance.activateForProfile(session);
+      await LocalAuthService.markOfflineUntil(
+        verifiedAt.add(const Duration(days: 1)),
+      );
       return session;
     }
   }
 
-  static Future<void> _savePreferences(Map<String, dynamic> session) async {
+  static Future<void> clearLegacyPreferences() async {
     final prefs = await SharedPreferences.getInstance();
-    for (final key in sessionKeys) {
-      await prefs.setString(key, (session[key] ?? '').toString());
-    }
-    final offline = session['offlineLogin'] == true;
-    await prefs.setBool('offlineLogin', offline);
-    if (offline) {
-      await prefs.setString(
-        'offlineExpiresAt',
-        (session['offlineExpiresAt'] ?? '').toString(),
-      );
-    } else {
-      await prefs.remove('offlineExpiresAt');
-    }
-  }
-
-  static Future<void> clearPreferencesOnly() async {
-    final prefs = await SharedPreferences.getInstance();
-    for (final key in sessionKeys) {
+    for (final key in _legacySessionKeys) {
       await prefs.remove(key);
     }
     await prefs.remove('offlineLogin');
     await prefs.remove('offlineExpiresAt');
+  }
+
+  static Future<void> clearSession() async {
+    await SqliteService.instance.clearActiveAccount();
+    await DeviceSessionService.clear();
+    await LocalAuthService.clear();
+    await clearLegacyPreferences();
   }
 }

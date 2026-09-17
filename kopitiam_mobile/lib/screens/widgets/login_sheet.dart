@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/api_service.dart';
 import '../../services/local_auth_service.dart';
+import '../../services/sqlite_service.dart';
 import '../login_screen.dart';
 
 class LoginSheet extends StatefulWidget {
@@ -47,12 +47,12 @@ class _LoginSheetState extends State<LoginSheet> {
         );
         return;
       }
-      await _saveSession(result);
       await LocalAuthService.saveAfterOnlineLogin(
         username: username,
         password: password,
         profile: result,
       );
+      await SqliteService.instance.activateForProfile(result);
       if (!mounted) return;
       Navigator.of(context).pop();
       widget.onVerified(result);
@@ -63,7 +63,7 @@ class _LoginSheetState extends State<LoginSheet> {
       );
       if (!mounted) return;
       if (offline != null) {
-        await _saveSession(offline);
+        await SqliteService.instance.activateForProfile(offline);
         if (!mounted) return;
         Navigator.of(context).pop();
         widget.onVerified(offline);
@@ -77,36 +77,6 @@ class _LoginSheetState extends State<LoginSheet> {
       });
     } finally {
       if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _saveSession(Map<String, dynamic> session) async {
-    final prefs = await SharedPreferences.getInstance();
-    for (final key in [
-      'token',
-      'deviceToken',
-      'username',
-      'role',
-      'roleVerifiedOnline',
-      'kodeUiw',
-      'kodeUp3',
-      'kodeUlp',
-      'ulp',
-      'bidang',
-      'tim',
-      'subTim',
-      'aksesMenu',
-    ]) {
-      await prefs.setString(key, (session[key] ?? '').toString());
-    }
-    await prefs.setBool('offlineLogin', session['offlineLogin'] == true);
-    if (session['offlineExpiresAt'] != null) {
-      await prefs.setString(
-        'offlineExpiresAt',
-        session['offlineExpiresAt'].toString(),
-      );
-    } else {
-      await prefs.remove('offlineExpiresAt');
     }
   }
 

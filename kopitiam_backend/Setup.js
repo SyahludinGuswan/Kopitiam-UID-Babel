@@ -10,14 +10,6 @@ var DEVICE_CLEANUP_HANDLER = "bersihkanTokenPerangkatKedaluwarsa";
  * di sini, otorisasi ulang tidak pernah terpicu dan upload foto ditolak.
  */
 function setupBackend() {
-  var props = PropertiesService.getScriptProperties();
-  if (!props.getProperty("PASSWORD_PEPPER")) {
-    props.setProperty(
-      "PASSWORD_PEPPER",
-      Utilities.getUuid() + Utilities.getUuid() + Utilities.getUuid(),
-    );
-  }
-
   // Menyentil Drive agar editor memicu ulang otorisasi saat manifest berubah.
   DriveApp.getRootFolder();
 
@@ -32,7 +24,6 @@ function setupBackend() {
     "Kode ULP",
     "ULP",
     "Username",
-    "Password",
     "Role",
     "Bidang",
     "Tim",

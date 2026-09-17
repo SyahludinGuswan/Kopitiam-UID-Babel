@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/login_screen.dart';
 import 'screens/startup_screen.dart';
@@ -9,6 +8,7 @@ import 'services/api_service.dart';
 import 'services/device_session_service.dart';
 import 'services/local_auth_service.dart';
 import 'services/mock_location_guard_service.dart';
+import 'services/session_bootstrap_service.dart';
 import 'theme/kopitiam_theme.dart';
 
 final appNavigatorKey = GlobalKey<NavigatorState>();
@@ -81,15 +81,11 @@ class _SessionGuardState extends State<_SessionGuard>
   }
 
   Future<void> _forceLogoutForMockLocation() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token') ?? '';
+    final token = await DeviceSessionService.token();
     try {
       await ApiService.logoutPerangkat(token: token);
-    } catch (_) {
-      await DeviceSessionService.clear();
-    }
-    await LocalAuthService.clear();
-    await prefs.clear();
+    } catch (_) {}
+    await SessionBootstrapService.clearSession();
     if (!mounted) return;
     setState(() => _mockLocationBlocked = true);
     appNavigatorKey.currentState?.pushAndRemoveUntil(
@@ -99,19 +95,10 @@ class _SessionGuardState extends State<_SessionGuard>
   }
 
   Future<void> _enforceOfflineExpiry() async {
-    final prefs = await SharedPreferences.getInstance();
-    final offline = prefs.getBool('offlineLogin') ?? false;
-    final expiresAt = DateTime.tryParse(
-      prefs.getString('offlineExpiresAt') ?? '',
-    )?.toUtc();
-    if (!offline ||
-        (expiresAt != null &&
-            DateTime.now().toUtc().isBefore(expiresAt))) {
+    if (!await LocalAuthService.storedOfflineSessionExpired()) {
       return;
     }
-    await DeviceSessionService.clear();
-    await LocalAuthService.clear();
-    await prefs.clear();
+    await SessionBootstrapService.clearSession();
     if (!mounted) return;
     appNavigatorKey.currentState?.pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const LoginScreen()),

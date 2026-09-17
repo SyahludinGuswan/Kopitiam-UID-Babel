@@ -1,0 +1,6 @@
+{
+  "name": "kopitiam-auth-service",
+  "private": true,
+  "scripts": { "test": "node --test test/*.test.js" },
+  "engines": { "node": ">=22" }
+}

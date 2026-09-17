@@ -18,6 +18,7 @@ Baseline main saat pekerjaan dimulai: `bf068bf6b4413d105704255a039db7653623f477`
 6. Root Eviden diambil dari Script Property EVIDENCE_ROOT_FOLDER_ID. Folder kanonik berakhir pada Kode Temuan; koreksi path mengikuti guard yang ada.
 7. REL-07 mencatat snapshot dan jurnal, mengklaim lease, menjalankan handler, memverifikasi hasil, lalu menyimpan receipt. Rekonsiliasi bisnis masih menggunakan sesi live pengguna. Trigger hanya pemulihan lease macet dan retensi.
 8. Mobile tidak diberi izin baru untuk menghapus pekerjaan hanya karena snapshot diterima. Kontrak receipt committed yang ada tetap berlaku; durable inbox terkelola dan receipt accepted masih rancangan terpisah.
+9. SEC-06 memindahkan hash password PBKDF2, salt, token opaque, dan perangkat ke project Apps Script Auth terpisah. Backend ini hanya meminta login, refresh, introspeksi, atau logout lewat HMAC internal dan memuat profil/otorisasi operasional tanpa kolom password.
 
 ## Build dan deployment
 
@@ -26,6 +27,8 @@ Dari direktori ini, jalankan `npm ci`, `npm run check`, lalu `npm test`. Build m
 Output deployment: `deploy/Runtime.js` dan `deploy/appsscript.json`. `.clasp.json` menunjuk rootDir deploy. `runtime-report.json` di luar direktori deployment mencatat asal fungsi dan hash source/runtime untuk audit. Jangan mengunggah source tingkat atas atau menyalin patch Z langsung ke editor. Sebelum push, periksa `clasp status`: hanya Runtime.js dan appsscript.json yang boleh masuk.
 
 Push/deploy produksi tidak dijalankan oleh perubahan PR ini. Sebelum deployment pertama bundle, ambil backup source Apps Script aktif dan inventaris trigger/external caller, cocokkan semua nama handler dengan laporan build, lalu lakukan uji staging. Jangan rollback ke source tanpa guard keamanan.
+
+Lihat `DEPLOY.md` untuk urutan provisioning SEC-06. Repository sengaja tidak menyimpan `.clasp.json` Auth, URL deployment, spreadsheet ID privat, atau Script Properties rahasia.
 
 ## Entry point dan trigger
 

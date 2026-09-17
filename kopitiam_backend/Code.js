@@ -10,8 +10,6 @@ var CONFIG = {
   WO_HAR_DU_SHEET: "WO_Har_Du",
   MATERIAL_HAR_JAR_SHEET: "Realisasi_Material_HarJar",
   TEMUAN_SHEET: "Inp_Temuan",
-  SESSION_TTL_SEC: 900,
-  MAX_LOGIN_FAILURES: 5,
   MAX_IMAGE_BYTES: 5 * 1024 * 1024,
   DRIVE_ROOT_FOLDER: "Kopitiam",
   MASTER_SHEETS: [
@@ -32,76 +30,14 @@ function runtimeIdentity_(body) {
 }
 
 function revokeBoundSession_(sessionToken, deviceToken) {
-  var cache = CacheService.getScriptCache();
-  if (sessionToken) cache.remove("session_" + String(sessionToken).trim());
-  if (deviceToken) {
-    PropertiesService.getScriptProperties().deleteProperty(
-      "device_" + String(deviceToken).trim(),
-    );
-  }
+  if (!sessionToken) return;
+  try { authServiceCall_("logout", { token: String(sessionToken).trim(), deviceToken: String(deviceToken || "").trim() }); }
+  catch (error) { console.error("Pencabutan token Auth gagal:", error); }
 }
 
 function verifySessionDeviceBinding_(sessionToken, session) {
-  if (!session || typeof session !== "object") {
-    revokeBoundSession_(sessionToken, "");
-    return fail_("SESSION_BINDING_INVALID", "Sesi tidak terikat ke perangkat.");
-  }
-  var deviceToken = String(session.deviceToken || "").trim();
-  if (!/^[a-f0-9]{64}$/i.test(deviceToken)) {
-    revokeBoundSession_(sessionToken, "");
-    return fail_("SESSION_BINDING_INVALID", "Sesi tidak terikat ke perangkat.");
-  }
-  var props = PropertiesService.getScriptProperties();
-  var raw = props.getProperty("device_" + deviceToken);
-  if (!raw) {
-    revokeBoundSession_(sessionToken, "");
-    return fail_("DEVICE_UNKNOWN", "Perangkat sesi tidak dikenali.");
-  }
-  var record;
-  try {
-    record = JSON.parse(raw);
-  } catch (_) {
-    revokeBoundSession_(sessionToken, deviceToken);
-    return fail_("DEVICE_CORRUPT", "Data perangkat sesi rusak.");
-  }
-  var expiry = validateDeviceRecord_(record, Date.now());
-  if (expiry) {
-    revokeBoundSession_(sessionToken, deviceToken);
-    return fail_(expiry, "Sesi perangkat sudah berakhir.");
-  }
-  if (normalize_(record.username) !== normalize_(session.username)) {
-    revokeBoundSession_(sessionToken, deviceToken);
-    return fail_(
-      "SESSION_DEVICE_MISMATCH",
-      "Sesi tidak cocok dengan perangkat.",
-    );
-  }
-  var userRow = findUser_(session.username);
-  if (!userRow) {
-    revokeBoundSession_(sessionToken, deviceToken);
-    return fail_("ACCOUNT_INACTIVE", "Akun tidak aktif atau tidak ditemukan.");
-  }
-  var currentSignature = passwordSignature_(
-    String(userRow[USER_COL.password] || ""),
-  );
-  if (
-    !constantTimeEqual_(
-      currentSignature,
-      String(record.passwordSignature || ""),
-    )
-  ) {
-    revokeBoundSession_(sessionToken, deviceToken);
-    return fail_(
-      "DEVICE_REVOKED",
-      "Kredensial akun berubah. Silakan login ulang.",
-    );
-  }
-  var account = accountStatus_(session.username);
-  if (!account.exists || !account.active) {
-    revokeBoundSession_(sessionToken, deviceToken);
-    return fail_("ACCOUNT_INACTIVE", "Akun tidak aktif atau tidak ditemukan.");
-  }
-  return { success: true, deviceToken: deviceToken };
+  if (!session || typeof session !== "object" || !sessionToken) return fail_("SESSION_BINDING_INVALID", "Sesi tidak terikat ke perangkat.");
+  return { success: true, deviceToken: String(session.deviceToken || "").trim() };
 }
 
 var USER_COL = {
@@ -111,12 +47,11 @@ var USER_COL = {
   kodeUlp: 3,
   ulp: 4,
   username: 5,
-  password: 6,
-  role: 7,
-  bidang: 8,
-  tim: 9,
-  subTim: 10,
-  aksesMenu: 11,
+  role: 6,
+  bidang: 7,
+  tim: 8,
+  subTim: 9,
+  aksesMenu: 10,
 };
 
 function doGet(e) {
@@ -180,138 +115,44 @@ function loginPerangkat_(u, p, d) {
   p = String(p || "");
   if (!u || !p)
     return fail_("LOGIN_REQUIRED", "Username dan kata sandi wajib diisi.");
-  var c = CacheService.getScriptCache(),
-    k = "login_fail_" + sha256_(normalize_(u)).substring(0, 24),
-    n = Number(c.get(k) || 0);
-  if (n >= CONFIG.MAX_LOGIN_FAILURES)
-    return fail_(
-      "LOGIN_RATE_LIMIT",
-      "Terlalu banyak percobaan. Coba lagi 5 menit.",
-    );
-  var r = findUser_(u),
-    supplied = passwordSignature_(p),
-    expected = passwordSignature_(
-      r ? String(r[USER_COL.password] || "") : "__invalid_password__",
-    );
+  var auth = authServiceCall_("login", { username: u, password: p, device: safeText_(d, 120) });
   p = "";
-  if (!r || !constantTimeEqual_(expected, supplied)) {
-    c.put(k, String(n + 1), 300);
-    return fail_("LOGIN_FAILED", "Username atau kata sandi salah.");
-  }
-  c.remove(k);
-  r[USER_COL.password] = "";
-  var dt =
-      Utilities.getUuid().replace(/-/g, "") +
-      Utilities.getUuid().replace(/-/g, ""),
-    now = Date.now();
-  evictOldestDeviceIfNeeded_(normalize_(r[USER_COL.username]));
-  PropertiesService.getScriptProperties().setProperty(
-    "device_" + dt,
-    JSON.stringify({
-      username: String(r[USER_COL.username]).trim(),
-      passwordSignature: expected,
-      createdAt: now,
-      lastUsedAt: now,
-      device: safeText_(d, 120),
-    }),
-  );
-  var s = issueSession_(r, dt);
-  s.success = true;
-  s.deviceToken = dt;
-  return s;
+  if (!auth.success) return auth;
+  return operationalSession_(auth);
 }
 
 function cekPerangkat_(t) {
   t = String(t || "").trim();
-  if (!/^[a-f0-9]{64}$/i.test(t))
-    return fail_("DEVICE_INVALID", "Sesi perangkat tidak valid.");
-  var p = PropertiesService.getScriptProperties(),
-    key = "device_" + t,
-    raw = p.getProperty(key);
-  if (!raw)
-    return fail_(
-      "DEVICE_UNKNOWN",
-      "Sesi perangkat tidak dikenali. Silakan login ulang.",
-    );
-  var rec;
-  try {
-    rec = JSON.parse(raw);
-  } catch (_) {
-    p.deleteProperty(key);
-    return fail_(
-      "DEVICE_CORRUPT",
-      "Sesi perangkat rusak. Silakan login ulang.",
-    );
-  }
-  var expiry = validateDeviceRecord_(rec, Date.now());
-  if (expiry) {
-    p.deleteProperty(key);
-    return fail_(expiry, "Sesi perangkat sudah berakhir. Silakan login ulang.");
-  }
-  var account = accountStatus_(rec.username);
-  if (!account.exists || !account.active) {
-    p.deleteProperty(key);
-    return fail_("ACCOUNT_INACTIVE", "Akun tidak aktif atau tidak ditemukan.");
-  }
-  var r = findUser_(rec.username),
-    expected = passwordSignature_(
-      r ? String(r[USER_COL.password] || "") : "__invalid_password__",
-    );
-  if (
-    !r ||
-    !constantTimeEqual_(expected, String(rec.passwordSignature || ""))
-  ) {
-    p.deleteProperty(key);
-    return fail_("DEVICE_REVOKED", "Akun berubah. Silakan login ulang.");
-  }
-  r[USER_COL.password] = "";
-  rec.lastUsedAt = Date.now();
-  p.setProperty(key, JSON.stringify(rec));
-  var s = issueSession_(r, t);
-  s.success = true;
-  s.deviceToken = t;
-  return s;
+  if (!/^[a-f0-9]{64}$/i.test(t)) return fail_("DEVICE_INVALID", "Sesi perangkat tidak valid.");
+  var auth = authServiceCall_("refresh", { deviceToken: t });
+  if (!auth.success) return auth;
+  return operationalSession_(auth);
 }
 
 function logoutPerangkat_(d, t) {
-  var p = PropertiesService.getScriptProperties();
-  if (d) p.deleteProperty("device_" + String(d).trim());
-  if (t) CacheService.getScriptCache().remove("session_" + String(t).trim());
-  return { success: true };
+  var auth = authServiceCall_("logout", { token: String(t || "").trim(), deviceToken: String(d || "").trim() });
+  return auth.success ? { success: true } : auth;
 }
 
 function issueSession_(r, d) {
-  var t = Utilities.getUuid(),
-    s = userFromRow_(r);
-  s.token = t;
-  s.deviceToken = d;
-  s.loginAt = new Date().toISOString();
-  CacheService.getScriptCache().put(
-    "session_" + t,
-    JSON.stringify(s),
-    CONFIG.SESSION_TTL_SEC,
-  );
-  return s;
+  return fail_("AUTH_SERVICE_REQUIRED", "Penerbitan sesi harus melalui layanan autentikasi.");
 }
 
 function cekSesi_(t) {
   t = String(t || "").trim();
-  if (!/^[a-f0-9-]{36}$/i.test(t))
-    return fail_("SESSION_INVALID", "Sesi tidak valid atau sudah berakhir.");
-  var c = CacheService.getScriptCache(),
-    raw = c.get("session_" + t);
-  if (!raw)
-    return fail_("SESSION_EXPIRED", "Sesi tidak valid atau sudah berakhir.");
-  var sesi = JSON.parse(raw);
-  var binding = verifySessionDeviceBinding_(t, sesi);
-  if (!binding.success) return binding;
-  c.put("session_" + t, raw, CONFIG.SESSION_TTL_SEC);
-  return { success: true, sesi: sesi };
+  if (!/^[a-f0-9]{64}$/i.test(t)) return fail_("SESSION_INVALID", "Sesi tidak valid atau sudah berakhir.");
+  var auth = authServiceCall_("introspect", { token: t });
+  if (!auth.success) return auth;
+  var session = operationalSession_(auth);
+  if (!session.success) {
+    revokeBoundSession_(t, auth.deviceToken);
+    return session;
+  }
+  return { success: true, sesi: session };
 }
 
 function logout_(t) {
-  if (t) CacheService.getScriptCache().remove("session_" + String(t));
-  return { success: true };
+  return logoutPerangkat_("", t);
 }
 
 function getRoleProfile_(t) {
@@ -577,33 +418,12 @@ function userFromRow_(r) {
     kodeUlp: String(r[3] || ""),
     ulp: String(r[4] || ""),
     username: String(r[5] || ""),
-    role: String(r[7] || ""),
-    bidang: String(r[8] || ""),
-    tim: String(r[9] || ""),
-    subTim: String(r[10] || ""),
-    aksesMenu: String(r[11] || ""),
+    role: String(r[6] || ""),
+    bidang: String(r[7] || ""),
+    tim: String(r[8] || ""),
+    subTim: String(r[9] || ""),
+    aksesMenu: String(r[10] || ""),
   };
-}
-
-function passwordPepper_() {
-  var props = PropertiesService.getScriptProperties(), value = props.getProperty("PASSWORD_PEPPER");
-  if (value) return value;
-  var lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
-    value = props.getProperty("PASSWORD_PEPPER");
-    if (!value) {
-      value = Utilities.getUuid() + Utilities.getUuid() + Utilities.getUuid();
-      props.setProperty("PASSWORD_PEPPER", value);
-    }
-    return value;
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-function passwordSignature_(v) {
-  return sha256_(passwordPepper_() + "\n" + String(v || ""));
 }
 
 function headerIndex_(h) {

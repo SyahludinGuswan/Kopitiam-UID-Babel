@@ -9,6 +9,11 @@ gradle-wrapper.jar
 GeneratedPluginRegistrant.java
 .cxx/
 
-# Keystore dan key.properties sengaja di-commit ke repo ini agar build release
-# dapat dilakukan dari mesin mana pun. Sandi tidak ada di file ini karena sudah
-# diobfuscasi di dalam app/build.gradle.kts. Repo wajib tetap privat.
+# Material signing release hanya boleh berasal dari secret store lokal/CI.
+key.properties
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.der

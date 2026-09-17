@@ -60,7 +60,9 @@ void main() {
     test('clean Kopitiam baseline includes queue and Gardu fields', () {
       final source = File('lib/services/sqlite_service.dart').readAsStringSync();
       final helper = File('lib/services/database_helper.dart').readAsStringSync();
-      expect(source, contains("databaseName = 'kopitiam_local.db'"));
+      final storage = File('lib/services/local_account_storage.dart').readAsStringSync();
+      expect(storage, contains("legacyDatabaseName = 'kopitiam_local.db'"));
+      expect(storage, contains("_accountsDirectory = 'kopitiam_accounts'"));
       expect(source, contains('databaseVersion = 1'));
       expect(source, isNot(contains('onUpgrade:')));
       for (final column in ['sync_status', 'sync_error', 'retry_count', 'last_attempt_at']) {
