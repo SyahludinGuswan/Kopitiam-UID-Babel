@@ -4,12 +4,14 @@ on:
   push:
     branches: [main]
     paths:
-      - 'kopitiam_backend/**'
-      - '.github/workflows/backend-ci.yml'
+      - "kopitiam_backend/**"
+      - "kopitiam_auth/**"
+      - ".github/workflows/backend-ci.yml"
   pull_request:
     paths:
-      - 'kopitiam_backend/**'
-      - '.github/workflows/backend-ci.yml'
+      - "kopitiam_backend/**"
+      - pull_request.paths
+      - ".github/workflows/backend-ci.yml"
 
 permissions:
   contents: read
