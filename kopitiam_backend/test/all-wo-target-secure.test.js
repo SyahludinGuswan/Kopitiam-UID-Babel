@@ -57,3 +57,37 @@ test('missing WO, ULP, or work date is rejected', () => {
     'Kode WO': 'WO-1', ULP: 'Koba',
   }]), (error) => error.woCode === 'WO_TARGET_INCOMPLETE');
 });
+
+test('completed WO cannot transition back to progress', () => {
+  const api = load();
+  const finished = [headers, ['WO-1', 'Koba', '08 September 2026', 'Selesai']];
+  assert.throws(() => api.woVerifiedPrepareTargets_({ ulp: 'Koba' }, finished, headers, [{
+    'Kode WO': 'WO-1', ULP: 'Koba', Tanggal: '08 September 2026',
+    'Status WO': 'Progress Pekerjaan',
+  }]), (error) => error.woCode === 'WO_STATUS_TRANSITION_DENIED');
+});
+
+test('immutable WO identity fields cannot be changed', () => {
+  const api = load();
+  const identityHeaders = ['Kode WO', 'ULP', 'Tanggal', 'Status WO', 'Kode Temuan'];
+  const identityValues = [identityHeaders, ['WO-1', 'Koba', '08 September 2026', 'Menunggu', 'TO-1']];
+  assert.throws(() => api.woVerifiedPrepareTargets_({ ulp: 'Koba' }, identityValues, identityHeaders, [{
+    'Kode WO': 'WO-1', ULP: 'Koba', Tanggal: '08 September 2026',
+    'Status WO': 'Progress Pekerjaan', 'Kode Temuan': 'TO-LAIN',
+  }]), (error) => error.woCode === 'WO_IMMUTABLE_FIELD');
+});
+
+test('ROW and Har assignment policy is enforced from the existing row', () => {
+  const api = load();
+  const rowHeaders = ['Kode WO', 'ULP', 'Tanggal', 'Status WO', 'Tim Eksekusi', 'Tindak Lanjut'];
+  const rowValues = [rowHeaders, ['WO-1', 'Koba', '08 September 2026', 'Menunggu', 'ROW A', '']];
+  assert.throws(() => api.woVerifiedPrepareTargets_({ ulp: 'Koba', subTim: 'ROW B' }, rowValues, rowHeaders, [{
+    'Kode WO': 'WO-1', ULP: 'Koba', Tanggal: '08 September 2026', 'Status WO': 'Selesai',
+  }]), (error) => error.woCode === 'WO_ASSIGNMENT_DENIED');
+
+  const harHeaders = ['Kode WO', 'ULP', 'Tanggal', 'Status WO', 'Tim Eksekusi', 'Catatan Petugas'];
+  const harValues = [harHeaders, ['WO-2', 'Koba', '08 September 2026', 'Menunggu', 'petugas.a', '']];
+  assert.throws(() => api.woVerifiedPrepareTargets_({ ulp: 'Koba', username: 'petugas.b' }, harValues, harHeaders, [{
+    'Kode WO': 'WO-2', ULP: 'Koba', Tanggal: '08 September 2026', 'Status WO': 'Selesai',
+  }]), (error) => error.woCode === 'WO_ASSIGNMENT_DENIED');
+});
