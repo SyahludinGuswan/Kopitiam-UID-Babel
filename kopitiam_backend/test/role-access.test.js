@@ -56,6 +56,6 @@ test("role endpoint and no-WO C4A transaction are guarded", () => {
   assert.match(code, /a === "getRoleProfile"/);
   assert.match(router, /action === 'getRoleProfile'/);
   assert.match(upload, /requireC4aAccess_\(auth\.sesi\)/);
-  assert.match(upload, /\b(?:var\s+[^;]*,\s*)?isC4a = kodeWo === ""/);
+  assert.match(upload, /isC4a\s*=\s*kodeWo\s*===\s*""/);
   assert.match(upload, /"Kode UIW": safeText_\(central\.kodeUiw/);
 });
