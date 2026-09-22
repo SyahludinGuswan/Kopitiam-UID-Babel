@@ -112,6 +112,19 @@ function buildC4aFindingPath_(kodeUlp, object, code, now) {
   return "Kopitiam/Rekap Temuan Inspeksi/" + safePath_(kodeUlp) + "/" + safePath_(object) + "/" + year + "/" + monthName + "/" + day + "/" + safePath_(code) + "/";
 }
 
+function verifyTemuanWriteOwner_(values, index, target, session, row, context, isC4a) {
+  if (!target) return;
+  var existing = values[target - 1];
+  if (normalize_(existing[index["kode temuan"]]) !== normalize_(row["Kode Temuan"])) throw new Error("Identitas Temuan existing tidak cocok.");
+  if (normalizeCode_(existing[index["kode ulp"]]) !== normalizeCode_(context.kodeUlp)) throw new Error("Temuan existing bukan milik ULP sesi.");
+  if (normalize_(existing[index["kode wo"]]) !== normalize_(row["Kode WO"])) throw new Error("Parent WO Temuan existing tidak cocok.");
+  if (isC4a && normalize_(existing[index["user input"]]) !== normalize_(session.username)) throw new Error("Temuan C4A existing bukan milik akun sesi.");
+  ["jenis object", "tier", "tanggal", "folder path"].forEach(function (key) {
+    var incomingKey = { "jenis object": "Jenis Object", tier: "Tier", tanggal: "Tanggal", "folder path": "Folder Path" }[key];
+    if (normalize_(existing[index[key]]) !== normalize_(row[incomingKey])) throw new Error(incomingKey + " Temuan existing tidak boleh berubah.");
+  });
+}
+
 function syncTemuanInspeksiIdempotent_(token, incoming) {
   var auth = cekSesi_(token);
   if (!auth.success) return auth;
@@ -202,8 +215,13 @@ function syncTemuanInspeksiIdempotent_(token, incoming) {
     var headers = values.length && values[0].length ? values[0] : sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
     var validation = validateTemuanHeaders_(headers);
     if (!validation.success) return validation;
-    var headerIndex = headerIndex_(headers), target = 0;
-    for (var r = 1; r < values.length; r++) if (String(values[r][headerIndex["kode temuan"]] || "") === code) { target = r + 1; break; }
+    var headerIndex = headerIndex_(headers), matches = [];
+    for (var r = 1; r < values.length; r++) {
+      if (normalize_(values[r][headerIndex["kode temuan"]]) === normalize_(code)) matches.push(r + 1);
+    }
+    if (matches.length > 1) throw new Error("Kode Temuan existing tidak unik.");
+    var target = matches.length ? matches[0] : 0;
+    verifyTemuanWriteOwner_(values, headerIndex, target, auth.sesi, row, context, isC4a);
 
     var folder = folderPath_(row["Folder Path"]);
     var primary = putPhotoIdempotent_(folder, code, primaryPrepared); created.push(primary);

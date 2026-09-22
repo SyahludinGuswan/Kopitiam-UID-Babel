@@ -54,8 +54,11 @@ function fakeFolder() {
 }
 
 function backend() {
+  const normalize = (value) => String(value ?? "").trim().toLowerCase();
   const sandbox = {
     CONFIG: { MAX_IMAGE_BYTES: 5 * 1024 * 1024 },
+    normalize_: normalize,
+    normalizeCode_: normalize,
     validateJpegBytes_(bytes) {
       if (bytes[0] !== 0xff || bytes.at(-1) !== 0xd9)
         throw new Error("bad jpeg");
@@ -133,6 +136,41 @@ test("rollback trashes only files created by the failed request", () => {
   assert.equal(created.file.trashed, true);
 });
 
+test("existing finding ownership and immutable identity are enforced", () => {
+  const api = backend();
+  const headers = [
+    "kode wo", "kode temuan", "kode ulp", "user input",
+    "jenis object", "tier", "tanggal", "folder path",
+  ];
+  const index = Object.fromEntries(
+    headers.map((header, position) => [header, position]),
+  );
+  const existing = [[
+    "WO-1", "WO-1.TO-001", "ULP-1", "pegawai", "Jaringan", "Tier 1",
+    "22 September 2026", "Eviden/ULP-1/Jaringan/2026/09/22/WO-1.TO-001/",
+  ]];
+  const row = {
+    "Kode WO": "WO-1",
+    "Kode Temuan": "WO-1.TO-001",
+    "Jenis Object": "Jaringan",
+    Tier: "Tier 1",
+    Tanggal: "22 September 2026",
+    "Folder Path": "Eviden/ULP-1/Jaringan/2026/09/22/WO-1.TO-001/",
+  };
+  assert.doesNotThrow(() => api.verifyTemuanWriteOwner_(
+    existing, index, 1, { username: "pegawai" }, row,
+    { kodeUlp: "ULP-1" }, false,
+  ));
+  assert.throws(() => api.verifyTemuanWriteOwner_(
+    existing, index, 1, { username: "pegawai" }, { ...row, Tier: "Tier 2" },
+    { kodeUlp: "ULP-1" }, false,
+  ), /Tier Temuan existing tidak boleh berubah/);
+  assert.throws(() => api.verifyTemuanWriteOwner_(
+    existing, index, 1, { username: "pegawai-lain" }, row,
+    { kodeUlp: "ULP-1" }, true,
+  ), /bukan milik akun sesi/);
+});
+
 test("production router uses the idempotent transaction", () => {
   assert.match(production, /syncTemuanInspeksiIdempotent_\(b\.token, b\.row\)/);
   assert.doesNotMatch(production, /syncTemuanInspeksi_\(b\.token, b\.row\)/);
@@ -148,5 +186,7 @@ test("idempotent transaction validates before Drive and protects commit", () => 
   assert.match(helperSource, /photoIdempotencyKey_/);
   assert.match(helperSource, /rollbackCreatedPhotos_/);
   assert.match(helperSource, /removeStalePhotos_/);
+  assert.match(helperSource, /verifyTemuanWriteOwner_/);
+  assert.match(helperSource, /matches\.length > 1/);
   assert.match(helperSource, /LockService\.getScriptLock\(\)/);
 });
