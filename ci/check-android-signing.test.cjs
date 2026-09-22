@@ -17,7 +17,7 @@ const gradle = fs.readFileSync(
 );
 
 test('signing guard fails closed on tracked material and obfuscation', () => {
-  assert.match(guard, /git\s*['\"]ls-files['\"]/);
+  assert.match(guard, /execFileSync\(['\"]git['\"],\s*\[['\"]ls-files['\"]\]/);
   assert.match(guard, /process\.exit\(1\)/);
   assert.match(guard, /key\\?\.properties/);
   assert.match(guard, /\.jks/);
