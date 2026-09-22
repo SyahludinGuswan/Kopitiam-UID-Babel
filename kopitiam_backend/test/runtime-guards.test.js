@@ -12,7 +12,7 @@ const source = fs.readFileSync(path.join(root, "RuntimeGuards.js"), "utf8");
 function load() {
   const cache = new Map();
   const sandbox = {
-    Date, Number, String,
+    Date, Number, String, Math, isFinite,
     sha256_: (value) => `hash-${value}`.padEnd(64, "0"),
     fail_: (kode, message) => ({ success: false, kode, message }),
     CacheService: { getScriptCache: () => ({ get: (key) => cache.get(key) || null, put: (key, value) => cache.set(key, value) }) },
@@ -44,12 +44,15 @@ test("sensitive action quota fails closed after its limit", () => {
 
 test("unknown actions do not consume a quota bucket", () => assert.equal(load().consumeActionQuota_("health", "x").success, true));
 
-test("vegetasi finding skips master priority comparison", () => {
+test("vegetation priority is derived server-side from finding identity", () => {
   const api = load();
   assert.equal(api.isVegetasiFinding_("Rabas / Pangkas"), true);
   assert.equal(api.isVegetasiFinding_("Tebang Sedang"), true);
   assert.equal(api.isVegetasiFinding_("Tebang Besar"), true);
   assert.equal(api.isVegetasiFinding_("Kabel Geser"), false);
-  assert.match(source, /isVegetasiFinding_\(finding\)/);
-  assert.match(source, /normalize_\(expected\)\s*!==\s*normalize_\(priority\)/);
+  assert.equal(api.findingPriority_("Tebang Besar", "Minor", {
+    "Jarak Terhadap Jaringan": 4,
+    "Tinggi Pohon": 10,
+  }), "Mayor");
+  assert.match(source, /function findingPriority_\(/);
 });
