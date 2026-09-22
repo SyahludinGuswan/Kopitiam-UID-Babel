@@ -2,15 +2,19 @@ name: Backend CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
     paths:
       - "kopitiam_backend/**"
       - "kopitiam_auth/**"
+      - "ci/**"
       - ".github/workflows/backend-ci.yml"
+
   pull_request:
     paths:
       - "kopitiam_backend/**"
-      - pull_request.paths
+      - "kopitiam_auth/**"
+      - "ci/**"
       - ".github/workflows/backend-ci.yml"
 
 permissions:
@@ -18,21 +22,71 @@ permissions:
 
 jobs:
   syntax-security-tests:
+    name: Backend syntax and security tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
     defaults:
       run:
         working-directory: kopitiam_backend
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: kopitiam_backend/package-lock.json
+
       - name: Install locked dependencies
         run: npm ci
+
       - name: JavaScript syntax
         run: npm run check
+
       - name: Backend regression tests
         run: npm test
+
+  auth-regression-tests:
+    name: Auth regression tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: kopitiam_auth
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Auth dependencies
+        run: npm install
+
+      - name: Auth regression tests
+        run: npm test
+
+  signing-guard:
+    name: Android signing guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check Android signing material
+        run: node ci/check-android-signing.cjs
