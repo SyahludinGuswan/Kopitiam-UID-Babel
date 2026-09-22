@@ -14,7 +14,19 @@ const upload = read("IdempotentUpload.js");
 const router = read("ZZ_ApiRouterOverride.js");
 
 function loadCentralRole(role) {
-  const row = ["1", "16", "161", "16140", "ULP Koba", "pegawai", role, "", "", "", ""];
+  const row = [
+    "1",
+    "16",
+    "161",
+    "16140",
+    "ULP Koba",
+    "pegawai",
+    role,
+    "",
+    "",
+    "",
+    "",
+  ];
   const sandbox = {
     console,
     fail_: (kode, message) => ({ success: false, kode, message }),
@@ -56,6 +68,6 @@ test("role endpoint and no-WO C4A transaction are guarded", () => {
   assert.match(code, /a === "getRoleProfile"/);
   assert.match(router, /action === 'getRoleProfile'/);
   assert.match(upload, /requireC4aAccess_\(auth\.sesi\)/);
-  assert.match(upload, /isC4a\s*=\s*kodeWo\s*===\s*""/);
+  assert.match(upload, /var isC4a = kodeWo === ""/);
   assert.match(upload, /"Kode UIW": safeText_\(central\.kodeUiw/);
 });
