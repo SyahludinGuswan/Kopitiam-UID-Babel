@@ -146,16 +146,17 @@ function syncTemuanInspeksiIdempotent_(token, incoming) {
   }
 
   var object = safeText_(incoming["Jenis Object"], 40);
-  var tier = safeText_(incoming.Tier, 20);
   var finding = safeText_(incoming.Temuan, 200);
-  var priority = safeText_(incoming.Prioritas, 20);
   var segment = safeText_(incoming.Segmen, 200);
-  if (tier !== "Tier 1" && tier !== "Tier 2") return fail_("TIER_INVALID", "Tier tidak valid.");
   if (object !== "Jaringan" && object !== "Gardu") return fail_("OBJECT_INVALID", "Jenis Object harus Jaringan atau Gardu.");
   if (!finding || !segment) return fail_("FINDING_INVALID", "Data wajib temuan belum valid.");
 
-  var master = validateFindingMaster_(object, tier, finding, priority);
+  var master = resolveFindingMaster_(object, finding, incoming);
   if (!master.success) return master;
+  object = master.object;
+  var tier = master.tier;
+  finding = master.finding;
+  var priority = master.priority;
 
   var sub = normalize_(auth.sesi.subTim || auth.sesi.tim);
   if (!isC4a) {
@@ -178,7 +179,11 @@ function syncTemuanInspeksiIdempotent_(token, incoming) {
     var context = isC4a ? c4aContext_(auth.sesi, incoming) : woContext_(auth.sesi, kodeWo, true);
     if (!context.success) return context;
     var now = new Date(), row = {}, source = context.values || {};
-    if (!isC4a) {
+    if (isC4a) {
+      var asset = resolveFindingAsset_(object, incoming, context);
+      if (!asset.success) return asset;
+      Object.keys(asset.values).forEach(function (key) { source[key] = asset.values[key]; });
+    } else {
       var index = context.index, server = context.row;
       source = {
         "Kode UIW": server[index["kode uiw"]] || auth.sesi.kodeUiw || "",
