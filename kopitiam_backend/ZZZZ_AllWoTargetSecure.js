@@ -35,6 +35,70 @@ function woVerifiedColumn_(index, names) {
   return -1;
 }
 
+var WO_POLICY_MUTABLE_ = {
+  insjar: ['koordinat awal', 'koordinat akhir', 'realisasi kms', 'waktu mulai', 'waktu selesai', 'durasi pekerjaan', 'status wo'],
+  row: ['status wo', 'tindak lanjut', 'ukuran diamter batan (cm)', 'ukuran diameter batang (cm)', 'jenis tebangan', 'jenis pekerjaan', 'foto sesudah', 'link foto sesudah', 'waktu realisasi', 'user input', 'waktu input', 'folder path'],
+  insdu: ['beban utama r (a) wbp', 'beban utama s (a) wbp', 'beban utama t (a) wbp', 'beban jurusan n (a) wbp', 'tegangan r-s (v) wbp', 'tegangan s-t (v) wbp', 'tegangan r-t (v) wbp', 'tegangan r-n (v) wbp', 'tegangan s-n (v) wbp', 'tegangan t-n (v) wbp', 'beban utama r (a) lwbp', 'beban utama s (a) lwbp', 'beban utama t (a) lwbp', 'beban jurusan n (a) lwbp', 'tegangan r-s (v) lwbp', 'tegangan s-t (v) lwbp', 'tegangan r-t (v) lwbp', 'tegangan r-n (v) lwbp', 'tegangan s-n (v) lwbp', 'tegangan t-n (v) lwbp', 'cover fco atas', 'cover fco bawah', 'cover bushing tm', 'cover bushing tr', 'cover arrester', 'jumperan atas', 'jumperan bawah', 'waktu mulai', 'waktu selesai', 'durasi pekerjaan', 'status wo', 'kapasitas', 'jurusan terpasang', 'jurusan terpakai', 'koordinat penginputan wbp', 'waktu penginputan wbp', 'jarak antar gardu ke petugas (wbp)', 'koordinat penginputan lwbp', 'waktu penginputan lwbp', 'jarak antar gardu ke petugas (lwbp)'],
+  har: ['koordinat', 'lat', 'long', 'foto sesudah', 'link foto sesudah', 'catatan petugas', 'status wo', 'waktu mulai', 'waktu selesai', 'durasi', 'user input', 'waktu input', 'folder path']
+};
+
+var WO_POLICY_TRANSPORT_ = {
+  'clientpayloaddigest': true, 'clientphotodigest': true, 'foto sesudah base64': true,
+  'fotosesudahbase64': true, 'schemaversion': true, 'jobs': true, 'materials': true,
+  'module': true
+};
+
+function woPolicyMode_(headers, existing, normalized, index) {
+  var type = woVerifiedText_(normalized['jenis wo'] || (index['jenis wo'] === undefined ? '' : existing[index['jenis wo']]));
+  if (type.indexOf('har ') >= 0 || index['catatan petugas'] !== undefined) return 'har';
+  if (index['tindak lanjut'] !== undefined || index['jenis tebangan'] !== undefined) return 'row';
+  if (index.kapasitas !== undefined || index['beban utama r (a) wbp'] !== undefined || type.indexOf('gardu') >= 0) return 'insdu';
+  return 'insjar';
+}
+
+function woPolicyStatus_(value) {
+  var status = woVerifiedText_(value);
+  if (!status || ['menunggu', 'belum dikerjakan', 'to do', 'todo', 'open'].indexOf(status) >= 0) return 'open';
+  if (['progress pekerjaan', 'progress', 'in progress'].indexOf(status) >= 0) return 'progress';
+  if (['selesai', 'done', 'complete', 'completed'].indexOf(status) >= 0) return 'done';
+  return 'invalid';
+}
+
+function woPolicyValidate_(session, headers, index, existing, normalized) {
+  var mode = woPolicyMode_(headers, existing, normalized, index);
+  var mutable = WO_POLICY_MUTABLE_[mode];
+  var teamColumn = index['tim eksekusi'];
+  var assignment = teamColumn === undefined ? '' : woVerifiedText_(existing[teamColumn]);
+  if (mode === 'row' && assignment && assignment !== woVerifiedText_(session.subTim || session.tim)) {
+    woVerifiedFail_('WO_ASSIGNMENT_DENIED', 'WO ROW bukan penugasan tim akun ini.');
+  }
+  if (mode === 'har' && assignment && assignment !== woVerifiedText_(session.username)) {
+    woVerifiedFail_('WO_ASSIGNMENT_DENIED', 'WO Har bukan penugasan username ini.');
+  }
+
+  if (normalized['status wo'] !== undefined) {
+    var statusColumn = index['status wo'];
+    if (statusColumn === undefined) woVerifiedFail_('WO_STATUS_COLUMN_MISSING', 'Kolom Status WO tidak tersedia.');
+    var current = woPolicyStatus_(existing[statusColumn]);
+    var requested = woPolicyStatus_(normalized['status wo']);
+    if (requested === 'invalid' || requested === 'open' ||
+        (current === 'done' && requested !== 'done') ||
+        (current === 'progress' && requested === 'open')) {
+      woVerifiedFail_('WO_STATUS_TRANSITION_DENIED', 'Transisi Status WO tidak diizinkan.');
+    }
+  }
+
+  Object.keys(normalized).forEach(function (key) {
+    if (WO_POLICY_TRANSPORT_[key] || mutable.indexOf(key) >= 0) return;
+    var column = index[key];
+    if (column === undefined) return;
+    if (woVerifiedText_(existing[column]) !== woVerifiedText_(normalized[key])) {
+      woVerifiedFail_('WO_IMMUTABLE_FIELD', 'Field WO tidak boleh berubah: ' + headers[column] + '.');
+    }
+  });
+  return mode;
+}
+
 function woVerifiedPrepareTargets_(session, values, headers, rows) {
   var index = headerIndex_(headers);
   var codeColumn = woVerifiedColumn_(index, ['Kode WO']);
@@ -72,6 +136,7 @@ function woVerifiedPrepareTargets_(session, values, headers, rows) {
     if (!matches.length) woVerifiedFail_('WO_NOT_FOUND', 'WO tidak ditemukan untuk Kode WO, ULP, dan Tanggal Pekerjaan tersebut.');
     if (matches.length > 1) woVerifiedFail_('WO_TARGET_AMBIGUOUS', 'Ditemukan lebih dari satu baris dengan Kode WO, ULP, dan Tanggal Pekerjaan yang sama.');
     if (selected[matches[0]]) woVerifiedFail_('WO_TARGET_DUPLICATE', 'Satu baris WO tidak boleh dikirim dua kali dalam satu batch.');
+    woPolicyValidate_(session, headers, index, values[matches[0]], normalized);
     selected[matches[0]] = true;
     prepared.push({ incoming: incoming, normalized: normalized, code: code, rowIndex: matches[0] });
   }
@@ -161,9 +226,6 @@ function syncHarVerified_(token, mode, rows) {
       for (var r = 1; r < values.length; r++) {
         if (woVerifiedText_(values[r][codeColumn]) === woVerifiedText_(targets.prepared[0].code)) sameCode++;
       }
-      /* Har v2 currently resolves the final row by Kode WO internally. Until that
-       * resolver accepts the verified row index, block duplicate codes rather than
-       * risk writing a different date/ULP row. */
       if (sameCode > 1) {
         return fail_('WO_TARGET_AMBIGUOUS', 'Kode WO Har tidak unik. Sinkronisasi diblokir agar tidak menulis baris yang salah.');
       }
