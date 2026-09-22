@@ -20,7 +20,7 @@ test('signing guard fails closed on tracked material and obfuscation', () => {
   assert.match(guard, /execFileSync\(['\"]git['\"],\s*\[['\"]ls-files['\"]\]/);
   assert.match(guard, /process\.exit\(1\)/);
   assert.match(guard, /key\\?\.properties/);
-  assert.match(guard, /\.jks/);
+  assert.match(guard, /\\.(?:jks|keystore|p12|pfx|pem|der)/);
   assert.match(guard, /obfuscate/);
   assert.match(guard, /Base64/);
   assert.match(guard, /requiredReleaseSigningProperty/);
