@@ -17,10 +17,10 @@ const gradle = fs.readFileSync(
 );
 
 test('signing guard fails closed on tracked material and obfuscation', () => {
-  assert.match(guard, /git\\s*['\"]ls-files['\"]/);
-  assert.match(guard, /process\\.exit\\(1\\)/);
-  assert.match(guard, /key\\\\?\\.properties/);
-  assert.match(guard, /\\.jks/);
+  assert.match(guard, /git\s*['\"]ls-files['\"]/);
+  assert.match(guard, /process\.exit\(1\)/);
+  assert.match(guard, /key\\?\.properties/);
+  assert.match(guard, /\.jks/);
   assert.match(guard, /obfuscate/);
   assert.match(guard, /Base64/);
   assert.match(guard, /requiredReleaseSigningProperty/);
@@ -29,7 +29,7 @@ test('signing guard fails closed on tracked material and obfuscation', () => {
 test('release workflow executes the guard with read-only permissions', () => {
   assert.match(workflow, /pull_request:/);
   assert.match(workflow, /contents:\s*read/);
-  assert.match(workflow, /node ci\\/check-android-signing\\.cjs/);
+  assert.match(workflow, /node ci\/check-android-signing\.cjs/);
 });
 
 test('release signing remains fail-closed when required properties are missing', () => {
