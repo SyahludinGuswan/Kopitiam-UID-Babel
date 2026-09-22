@@ -39,15 +39,15 @@ test("operational account status is checked after Auth introspection", () => {
   assert.match(authBridge, /operationalSession_\(auth\)/);
 });
 
-test("master validation runs before idempotent Temuan transaction", () => {
+test("central master derivation runs before idempotent Temuan context", () => {
   assert.match(idempotent, /function syncTemuanInspeksiIdempotent_/);
   const fnStart = idempotent.indexOf("function syncTemuanInspeksiIdempotent_");
   const next = idempotent.indexOf("\nfunction ", fnStart + 1);
   const fnBody = idempotent.slice(fnStart, next < 0 ? undefined : next);
-  assert.match(fnBody, /validateFindingMaster_/);
+  assert.match(fnBody, /resolveFindingMaster_/);
+  assert.match(fnBody, /resolveFindingAsset_/);
   assert.match(fnBody, /incoming\["Jenis Object"\]/);
-  assert.match(fnBody, /incoming(?:\["Prioritas"\]|\.Prioritas)/);
-  const masterIdx = fnBody.indexOf("validateFindingMaster_");
+  const masterIdx = fnBody.indexOf("resolveFindingMaster_");
   const syncIdx = fnBody.indexOf("woContext_");
-  assert.ok(masterIdx < syncIdx, "master validation must run before woContext_");
+  assert.ok(masterIdx < syncIdx, "central master derivation must run before woContext_");
 });
