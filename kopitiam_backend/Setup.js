@@ -10,6 +10,7 @@ var DEVICE_CLEANUP_HANDLER = "bersihkanTokenPerangkatKedaluwarsa";
  * di sini, otorisasi ulang tidak pernah terpicu dan upload foto ditolak.
  */
 function setupBackend() {
+  // Menyentil Drive agar editor memicu ulang otorisasi saat manifest berubah.
   DriveApp.getRootFolder();
 
   var master = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
@@ -17,12 +18,40 @@ function setupBackend() {
   var temuan = SpreadsheetApp.openById(CONFIG.TEMUAN_SPREADSHEET_ID);
 
   ensureSheet_(master, CONFIG.USERS_SHEET, [
-    "No", "Kode UIW", "Kode UP3", "Kode ULP", "ULP", "Username", "Role", "Bidang", "Tim", "Sub-Tim", "Akses Menu"
+    "No",
+    "Kode UIW",
+    "Kode UP3",
+    "Kode ULP",
+    "ULP",
+    "Username",
+    "Role",
+    "Bidang",
+    "Tim",
+    "Sub-Tim",
+    "Akses Menu",
   ]);
-  requireSheet_(wo, CONFIG.WO_INSJAR_SHEET, ["Kode WO", "Kode ULP", "Status WO"]);
-  requireSheet_(wo, CONFIG.WO_ROW_SHEET, ["Kode WO", "Kode ULP", "Status WO", "Tim Eksekusi"]);
-  requireSheet_(wo, CONFIG.WO_HAR_JAR_SHEET, ["Kode WO", "Kode ULP", "Status WO", "Tim Eksekusi"]);
-  requireSheet_(wo, CONFIG.MATERIAL_HAR_JAR_SHEET, ["Kode Penggunaan Material", "Kode WO", "Material"]);
+  requireSheet_(wo, CONFIG.WO_INSJAR_SHEET, [
+    "Kode WO",
+    "Kode ULP",
+    "Status WO",
+  ]);
+  requireSheet_(wo, CONFIG.WO_ROW_SHEET, [
+    "Kode WO",
+    "Kode ULP",
+    "Status WO",
+    "Tim Eksekusi",
+  ]);
+  requireSheet_(wo, CONFIG.WO_HAR_JAR_SHEET, [
+    "Kode WO",
+    "Kode ULP",
+    "Status WO",
+    "Tim Eksekusi",
+  ]);
+  requireSheet_(wo, CONFIG.MATERIAL_HAR_JAR_SHEET, [
+    "Kode Penggunaan Material",
+    "Kode WO",
+    "Material",
+  ]);
   ensureSheet_(temuan, CONFIG.TEMUAN_SHEET, temuanSheetHeaders_());
 
   // Metadata is configured separately. Keep legacy setup idempotent while the
@@ -51,6 +80,11 @@ function setupBackend() {
   };
 }
 
+/**
+ * Menghapus token perangkat yang berumur lebih dari 7 hari, tidak dipakai
+ * selama 1 hari, rusak, atau memiliki waktu yang tidak masuk akal.
+ * Dipanggil otomatis setiap jam oleh trigger yang dibuat setupBackend().
+ */
 function bersihkanTokenPerangkatKedaluwarsa() {
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
@@ -60,6 +94,7 @@ function bersihkanTokenPerangkatKedaluwarsa() {
     var now = Date.now();
     var removed = 0;
     var active = 0;
+
     Object.keys(all).forEach(function (key) {
       if (key.indexOf("device_") !== 0) return;
       var remove = false;
@@ -67,17 +102,40 @@ function bersihkanTokenPerangkatKedaluwarsa() {
         var record = JSON.parse(all[key]);
         var createdAt = Number(record.createdAt || 0);
         var lastUsedAt = Number(record.lastUsedAt || createdAt || 0);
-        remove = !createdAt || !lastUsedAt || createdAt > now || lastUsedAt > now || now - createdAt >= DEVICE_TOKEN_MAX_AGE_MS || now - lastUsedAt >= DEVICE_TOKEN_IDLE_MS;
-      } catch (_) { remove = true; }
-      if (remove) { props.deleteProperty(key); removed++; } else active++;
+        remove =
+          !createdAt ||
+          !lastUsedAt ||
+          createdAt > now ||
+          lastUsedAt > now ||
+          now - createdAt >= DEVICE_TOKEN_MAX_AGE_MS ||
+          now - lastUsedAt >= DEVICE_TOKEN_IDLE_MS;
+      } catch (_) {
+        remove = true;
+      }
+      if (remove) {
+        props.deleteProperty(key);
+        removed++;
+      } else {
+        active++;
+      }
     });
+
     return { success: true, dihapus: removed, aktif: active };
-  } finally { lock.releaseLock(); }
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function pasangTriggerPembersihanToken_() {
-  var exists = ScriptApp.getProjectTriggers().some(function (trigger) { return trigger.getHandlerFunction() === DEVICE_CLEANUP_HANDLER; });
-  if (!exists) ScriptApp.newTrigger(DEVICE_CLEANUP_HANDLER).timeBased().everyHours(1).create();
+  var exists = ScriptApp.getProjectTriggers().some(function (trigger) {
+    return trigger.getHandlerFunction() === DEVICE_CLEANUP_HANDLER;
+  });
+  if (!exists) {
+    ScriptApp.newTrigger(DEVICE_CLEANUP_HANDLER)
+      .timeBased()
+      .everyHours(1)
+      .create();
+  }
 }
 
 function requireSheet_(spreadsheet, name, requiredHeaders) {
@@ -93,14 +151,34 @@ function ensureSheet_(spreadsheet, name, headers) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.setFrozenRows(1);
     sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold");
-  } else validateHeaders_(sheet, headers);
+  } else {
+    validateHeaders_(sheet, headers);
+  }
   return sheet;
 }
 
 function validateHeaders_(sheet, requiredHeaders) {
   var lastColumn = sheet.getLastColumn();
-  if (lastColumn < 1) throw new Error("Header sheet kosong: " + sheet.getName());
-  var current = sheet.getRange(1, 1, 1, lastColumn).getDisplayValues()[0].map(function (value) { return String(value || "").trim().toLowerCase(); });
-  var missing = requiredHeaders.filter(function (header) { return current.indexOf(String(header).trim().toLowerCase()) < 0; });
-  if (missing.length) throw new Error("Header sheet " + sheet.getName() + " tidak lengkap: " + missing.join(", "));
+  if (lastColumn < 1) {
+    throw new Error("Header sheet kosong: " + sheet.getName());
+  }
+  var current = sheet
+    .getRange(1, 1, 1, lastColumn)
+    .getDisplayValues()[0]
+    .map(function (value) {
+      return String(value || "")
+        .trim()
+        .toLowerCase();
+    });
+  var missing = requiredHeaders.filter(function (header) {
+    return current.indexOf(String(header).trim().toLowerCase()) < 0;
+  });
+  if (missing.length) {
+    throw new Error(
+      "Header sheet " +
+        sheet.getName() +
+        " tidak lengkap: " +
+        missing.join(", "),
+    );
+  }
 }
