@@ -78,7 +78,7 @@ function opjFindingProjection_(source, index) {
   return projection;
 }
 
-function operationJournalSweepStaleLeasesRel07_() {
+function operationJournalSweepStaleLeases_() {
   var source = operationJournalSheet_(), last = source.sheet.getLastRow();
   if (last < 2) return { success: true, released: 0 };
   var operationColumn = opjColumn_(source, 'Operation ID');
