@@ -1,4 +1,5 @@
 /* REL-07 behavior guard: immutable identity, complete fields, and lease-safe sweep. */
+/* Canonical stale-lease entry point is intentionally kept here for runtime selection. */
 var OPJ_TEMUAN_REQUIRED_HEADERS_ = [
   'kode wo', 'kode temuan', 'kode uiw', 'kode up3', 'kode ulp', 'ulp',
   'hari', 'tanggal', 'jenis object', 'tier', 'temuan', 'prioritas',

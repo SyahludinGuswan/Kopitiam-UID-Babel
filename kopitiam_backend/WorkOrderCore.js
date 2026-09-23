@@ -152,16 +152,11 @@ function woCoreSync_(token, mode, sheetName, rows) {
       normalized['folder path'] = folderPathVal;
       var b64Photo = normalized['foto sesudah base64'] || normalized['fotosesudahbase64'];
       if (b64Photo) {
-        try {
-          var uploaded = uploadWoPhoto_(folderPathVal, code, b64Photo, 'Foto Sesudah');
-          if (uploaded) {
-            var cleanPath = String(folderPathVal || '').replace(/[\/\\]+$/, '');
-            normalized['foto sesudah'] = cleanPath + '\\' + uploaded.name;
-            normalized['link foto sesudah'] = uploaded.url;
-          }
-        } catch (photoErr) {
-          console.error('Upload foto sesudah gagal:', photoErr);
-        }
+        var uploaded = uploadWoPhoto_(folderPathVal, code, b64Photo, 'Foto Sesudah');
+        if (!uploaded) throw new Error('PHOTO_UPLOAD_FAILED');
+        var cleanPath = String(folderPathVal || '').replace(/[\/\\]+$/, '');
+        normalized['foto sesudah'] = cleanPath + '\\' + uploaded.name;
+        normalized['link foto sesudah'] = uploaded.url;
       } else if (normalized['foto sesudah']) {
         var rawName = String(normalized['foto sesudah']).trim();
         if (rawName && rawName.indexOf('\\') < 0 && rawName.indexOf('/') < 0) {
