@@ -17,5 +17,5 @@ test("P2 preserves the Insdu voltage measurement contract", () => {
 });
 
 test("P2 normalizes both slash styles in stored photo paths", () => {
-  assert.match(wo, /replace\(\[\\\\\\\/\\\\\\\\\]\+\$, ''\)/);
+  assert.ok(wo.includes("replace(/[\\/\\\\]+$/, '')"));
 });
