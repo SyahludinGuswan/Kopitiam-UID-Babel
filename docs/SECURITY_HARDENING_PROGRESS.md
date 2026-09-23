@@ -20,6 +20,7 @@
 | SEC-08 | Selesai di source | PR #2 merged | Policy assignment, immutable fields, dan transisi status WO sudah diuji. |
 | SEC-10 | Selesai di source | PR #1 merged | Identitas Temuan dan ownership record existing dilindungi saat retry/overwrite. |
 | SEC-11 | Selesai di source | PR #3 merged melalui commit `19b9ace` | Tier, Temuan canonical, Prioritas, dan relasi aset diturunkan dari master pusat. |
+| REL-03 | Selesai di source/CI | PR #7 merged melalui commit `f56e7ae`; external `REVISION_INDEX`, `REVISION_AUDIT`, stable key, conflict check, lock, dan sparse-write | Tidak menambah kolom fisik pada business sheet. Read tetap kompatibel sebelum metadata diprovision; write fail-closed sampai `REVISION_METADATA_SPREADSHEET_ID` dikonfigurasi. |
 
 ## Selesai di source, validasi operasional pending
 
@@ -30,9 +31,8 @@
 
 ## Audit berikutnya
 
-1. **REL-03:** hentikan full-row rewrite, pertahankan formula, dan tambahkan revision check sebelum write.
-2. **P2 hardening:** validasi JPEG, pembatasan master data, pemrosesan foto, permission iOS, dan release hardening.
-3. **Validasi operasional:** perangkat nyata, jaringan buruk, restart, pergantian akun, fault injection staging, backup/restore, ACL, logging, dan rollback.
+1. **P2 hardening:** validasi JPEG, pembatasan master data, pemrosesan foto, permission iOS, dan release hardening.
+2. **Validasi operasional:** perangkat nyata, jaringan buruk, restart, pergantian akun, fault injection staging, backup/restore, ACL, logging, dan rollback.
 
 ## Aturan produksi
 
