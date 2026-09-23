@@ -70,10 +70,6 @@ function operationJournalReplay_(record) {
   } catch (_) { return null; }
 }
 
-function operationJournalSweepStaleLeases_() {
-  return operationJournalSweepStaleLeasesRel07_();
-}
-
 function operationJournalScheduledMaintenance_() {
   var released = operationJournalSweepStaleLeases_();
   /* Safe unattended work is limited to stale-lease recovery. Business replay
