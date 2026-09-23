@@ -25,7 +25,19 @@ function setupBackend() {
   requireSheet_(wo, CONFIG.MATERIAL_HAR_JAR_SHEET, ["Kode Penggunaan Material", "Kode WO", "Material"]);
   ensureSheet_(temuan, CONFIG.TEMUAN_SHEET, temuanSheetHeaders_());
 
-  ensureRevisionMetadataSheets_();
+  // Metadata is configured separately. Keep legacy setup idempotent while the
+  // Script Property is not yet present; all revision-protected writes remain
+  // fail-closed because their metadata helper still requires this property.
+  var revisionMetadata = "not_configured";
+  var metadataProperty = typeof REVISION_METADATA_CONFIG_ !== "undefined"
+    ? REVISION_METADATA_CONFIG_.spreadsheetProperty
+    : "REVISION_METADATA_SPREADSHEET_ID";
+  var metadataId = PropertiesService.getScriptProperties().getProperty(metadataProperty);
+  if (String(metadataId || "").trim()) {
+    ensureRevisionMetadataSheets_();
+    revisionMetadata = "configured";
+  }
+
   pasangTriggerPembersihanToken_();
   var cleanup = bersihkanTokenPerangkatKedaluwarsa();
   return {
@@ -34,7 +46,7 @@ function setupBackend() {
     version: "2.5.3",
     deviceTokenMaxDays: 7,
     deviceTokenIdleDays: 1,
-    revisionMetadata: "configured",
+    revisionMetadata: revisionMetadata,
     expiredTokensRemoved: cleanup.dihapus,
   };
 }
