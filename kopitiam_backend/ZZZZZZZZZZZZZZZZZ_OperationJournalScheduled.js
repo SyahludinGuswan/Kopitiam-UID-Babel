@@ -70,26 +70,6 @@ function operationJournalReplay_(record) {
   } catch (_) { return null; }
 }
 
-function operationJournalSweepStaleLeases_() {
-  var source = operationJournalSheet_(), last = source.sheet.getLastRow();
-  if (last < 2) return { success: true, released: 0 };
-  var values = source.sheet.getRange(2, 1, last - 1, source.headers.length).getDisplayValues();
-  var now = operationJournalNow_(), released = 0;
-  for (var i = 0; i < values.length; i++) {
-    var state = normalize_(values[i][opjColumn_(source, 'State')]);
-    var lease = Date.parse(values[i][opjColumn_(source, 'Lease Until')] || '');
-    if (state !== 'processing' || !isFinite(lease) || lease > now.getTime()) continue;
-    operationJournalWrite_(source, i + 2, {
-      'State': 'needs-reconciliation', 'Lease Until': '', 'Lease Token': '',
-      'Error Code': 'STALE_PROCESSING_LEASE',
-      'Error Message': 'Lease worker berakhir sebelum receipt committed.',
-      'Next Reconciliation At': operationJournalIso_(now)
-    });
-    released++;
-  }
-  return { success: true, released: released };
-}
-
 function operationJournalScheduledMaintenance_() {
   var released = operationJournalSweepStaleLeases_();
   /* Safe unattended work is limited to stale-lease recovery. Business replay
