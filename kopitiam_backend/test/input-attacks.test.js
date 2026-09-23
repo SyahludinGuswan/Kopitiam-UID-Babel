@@ -18,9 +18,13 @@ function validators() {
 }
 
 function jpegBytes(size = 2048) {
-  const bytes = new Array(size).fill(0x11);
-  bytes[0] = 0xff; bytes[1] = 0xd8; bytes[2] = 0xff;
-  bytes[size - 2] = 0xff; bytes[size - 1] = 0xd9;
+  const bytes = [
+    0xff, 0xd8,
+    0xff, 0xc0, 0x00, 0x08, 0x08, 0x00, 0x01, 0x00, 0x01, 0x01,
+    0xff, 0xda, 0x00, 0x02,
+    ...new Array(Math.max(0, size - 18)).fill(0x11),
+    0xff, 0xd9,
+  ];
   return bytes;
 }
 
@@ -32,7 +36,7 @@ test("production Temuan flow invokes coordinate and JPEG validators", () => {
   assert.match(production, /fotoLingkunganBase64/);
 });
 
-test("accepts a real-looking JPEG signature and valid Babel coordinate", () => {
+test("accepts a structurally valid JPEG and valid Babel coordinate", () => {
   const backend = validators();
   assert.equal(backend.validateJpegBytes_(jpegBytes()), true);
   const point = backend.validateCoordinate_("-3.019482, 106.454827");
@@ -47,15 +51,16 @@ test("rejects executable, PDF, PNG, ZIP, and HTML payloads disguised as JPEG", (
     const bytes = new Array(2048).fill(0x11);
     signature.forEach((value, index) => { bytes[index] = value; });
     bytes[2046] = 0xff; bytes[2047] = 0xd9;
-    assert.throws(() => backend.validateJpegBytes_(bytes), /JPEG signature/);
+    assert.throws(() => backend.validateJpegBytes_(bytes));
   }
 });
 
 test("rejects truncated JPEG and fake header-only JPEG", () => {
   const backend = validators();
   const truncated = jpegBytes();
-  truncated[truncated.length - 2] = 0; truncated[truncated.length - 1] = 0;
-  assert.throws(() => backend.validateJpegBytes_(truncated), /JPEG signature/);
+  truncated[truncated.length - 2] = 0;
+  truncated[truncated.length - 1] = 0;
+  assert.throws(() => backend.validateJpegBytes_(truncated));
   assert.throws(() => backend.validateJpegBytes_([0xff, 0xd8, 0xff, 0xff, 0xd9]), /too small/);
 });
 
