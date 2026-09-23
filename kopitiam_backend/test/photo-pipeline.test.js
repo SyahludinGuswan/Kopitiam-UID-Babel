@@ -14,6 +14,10 @@ test("P2 photo pipeline does not silently continue after WO upload failure", () 
 });
 
 test("P2 preserves the Insdu voltage measurement contract", () => {
-  assert.match(guard, /tegangan r-t \(v\) wbp/);
-  assert.doesNotMatch(guard, /tegangan t-r \(v\) wbp/);
+  assert.match(wo, /tegangan r-t \\(v\\) wbp/);
+  assert.doesNotMatch(wo, /tegangan t-r \\(v\\) wbp/);
+});
+
+test("P2 guard remains compatible with the runtime builder", () => {
+  assert.doesNotMatch(guard, /^\s*[A-Za-z_$][\w$]*\.[^\n=]+=/m);
 });
