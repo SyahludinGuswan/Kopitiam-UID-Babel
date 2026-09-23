@@ -34,8 +34,9 @@ function masterScopeValue_(session, field) {
 
 function masterScopeFields_(headers) {
   var index = headerIndex_(headers), fields = [];
-  [['kode ulp', 'kode ulp'], ['ulp', 'ulp'], ['kode up3', 'kode up3'], ['up3', 'up3'], ['kode uiw', 'kode uiw'], ['uiw', 'uiw']].forEach(function (pair) {
-    if (index[pair[0]] !== undefined) fields.push({ key: pair[0], column: index[pair[0]] });
+  [['kode ulp', 'ulp'], ['kode up3', 'up3'], ['kode uiw', 'uiw']].forEach(function (pair) {
+    var codeColumn = index[pair[0]], nameColumn = index[pair[1]];
+    if (codeColumn !== undefined || nameColumn !== undefined) fields.push({ codeKey: pair[0], codeColumn: codeColumn, nameKey: pair[1], nameColumn: nameColumn });
   });
   return fields;
 }
@@ -45,13 +46,18 @@ function masterRowMatchesSession_(headers, row, session) {
   if (!fields.length) return true;
   var hasScopedValue = false;
   for (var i = 0; i < fields.length; i++) {
-    var rowValue = normalize_(row[fields[i].column]);
-    if (!rowValue) continue;
+    var field = fields[i];
+    var rowCode = field.codeColumn === undefined ? '' : normalize_(row[field.codeColumn]);
+    var rowName = field.nameColumn === undefined ? '' : normalize_(row[field.nameColumn]);
+    if (!rowCode && !rowName) continue;
     hasScopedValue = true;
-    var expected = masterScopeValue_(session, fields[i].key);
-    if (!expected) return false;
-    var comparableRow = fields[i].key.indexOf('kode ') === 0 ? normalizeCode_(row[fields[i].column]) : rowValue;
-    if (comparableRow !== expected) return false;
+    if (rowCode) {
+      var expectedCode = masterScopeValue_(session, field.codeKey);
+      if (!expectedCode || normalizeCode_(row[field.codeColumn]) !== expectedCode) return false;
+    } else {
+      var expectedName = masterScopeValue_(session, field.nameKey);
+      if (!expectedName || rowName !== expectedName) return false;
+    }
   }
   return hasScopedValue;
 }
