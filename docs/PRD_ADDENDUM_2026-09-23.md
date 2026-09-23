@@ -33,6 +33,27 @@ Before enabling revision-protected writes in production:
 4. Perform staging concurrency tests, formula-preservation tests, and stale-token conflict tests.
 5. Deploy the same tested runtime bundle and retain rollback evidence.
 
+## P2 hardening status
+
+The following P2 source remediations are complete in source, regression tests, CI, and merged PRs:
+
+- **JPEG structure/content validation:** PR #9, merged as commit `2a68eee`.
+- **Photo processing and upload failure handling:** PR #10, merged as commit `72a4384`. Required WO photo upload failures now fail closed with `PHOTO_UPLOAD_FAILED`, stored paths normalize both slash styles, and stale-lease handling uses fresh reads under lock in the selected runtime implementation.
+- **Master-data exposure and filtering:** PR #11, merged as commit `3e539a4`. Master datasets now use an explicit global/scoped policy; scoped rows require matching ULP/UP3/UIW ownership, and unresolved or unclassified scoped datasets fail closed.
+- **iOS permissions and privacy configuration:** PR #12, merged as commit `0a474c8`. Camera, location-when-in-use, and photo-library usage descriptions are declared without background location or background modes. Physical-device denied-permission and release-build validation remain pending.
+
+No production data, secrets, or deployment changes were made by these P2 source remediations.
+
+## Remaining P2 and operational validation
+
+Open follow-up work remains:
+
+- Mobile/backend release hardening.
+- Staging-only fault injection for Sheet, Drive, lock, crash, and timeout scenarios.
+- Physical-device validation for iOS denied permissions and release configuration.
+- Real-device session, restart, offline, backup/restore, and account-switch testing.
+- Production provisioning and verification for REL-03 and SEC-06 remain separate from source completion.
+
 ## Next audit scope
 
 REL-03 is no longer an open audit item. The next source audit is **P2 hardening**, followed by operational validation:
