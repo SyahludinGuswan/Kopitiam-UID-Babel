@@ -70,6 +70,41 @@ function operationJournalReplay_(record) {
   } catch (_) { return null; }
 }
 
+function operationJournalSweepStaleLeases_() {
+  var source = operationJournalSheet_(), last = source.sheet.getLastRow();
+  if (last < 2) return { success: true, released: 0 };
+  var operationColumn = opjColumn_(source, 'Operation ID');
+  var snapshot = source.sheet.getRange(2, 1, last - 1, source.headers.length).getDisplayValues();
+  var now = operationJournalNow_(), released = 0;
+  for (var i = 0; i < snapshot.length; i++) {
+    var operationId = String(snapshot[i][operationColumn] || '').trim();
+    if (!operationId) continue;
+    var lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      var freshSource = operationJournalSheet_();
+      var found = operationJournalFind_(freshSource, operationId);
+      if (!found) continue;
+      var record = operationJournalObject_(freshSource, found);
+      var state = normalize_(record['State']);
+      var lease = Date.parse(record['Lease Until'] || '');
+      if (state !== 'processing' || !isFinite(lease) || lease > now.getTime()) continue;
+      operationJournalWrite_(freshSource, found.rowNumber, {
+        'State': 'needs-reconciliation',
+        'Lease Until': '',
+        'Lease Token': '',
+        'Error Code': 'STALE_PROCESSING_LEASE',
+        'Error Message': 'Lease worker berakhir sebelum receipt committed.',
+        'Next Reconciliation At': operationJournalIso_(now)
+      });
+      released++;
+    } finally {
+      lock.releaseLock();
+    }
+  }
+  return { success: true, released: released };
+}
+
 function operationJournalScheduledMaintenance_() {
   var released = operationJournalSweepStaleLeases_();
   /* Safe unattended work is limited to stale-lease recovery. Business replay
