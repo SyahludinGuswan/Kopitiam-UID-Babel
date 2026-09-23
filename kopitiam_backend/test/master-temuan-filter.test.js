@@ -11,7 +11,8 @@ const source = fs.readFileSync(path.join(root, "ZZ_MasterDataFiltered.js"), "utf
 
 function load() {
   const sandbox = {
-    normalize_: (value) => String(value || "").trim().toLowerCase(),
+    normalize_: (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, " "),
+    normalizeCode_: (value) => String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/^0+/, ""),
     headerIndex_: (headers) => Object.fromEntries(headers.map((value, index) => [String(value).trim().toLowerCase(), index])),
     CONFIG: { USERS_SHEET: "User_App_Mobile" },
     USER_COL: { username: 0 },
@@ -30,6 +31,20 @@ function masterSheet() {
         ["Jaringan", "Tier 2", "Andongan Rendah"],
         ["Inspeksi Gardu", "Tier 1", "Trafo Bocor"],
         ["Gardu Distribusi", "Tier 2", "Bushing Rusak"],
+      ],
+    }),
+  };
+}
+
+function scopedSheet() {
+  return {
+    getDataRange: () => ({
+      getDisplayValues: () => [
+        ["Kode ULP", "Kode UP3", "Nama", "Rahasia"],
+        ["001", "010", "A", "alpha"],
+        ["002", "010", "B", "beta"],
+        ["001", "011", "C", "cross-up3"],
+        ["", "", "Unscoped", "ambiguous"],
       ],
     }),
   };
@@ -70,4 +85,12 @@ test("object aliases normalize to the mobile categories", () => {
   assert.equal(api.masterObjectCategory_("JTM / JTR"), "jaringan");
   assert.equal(api.masterObjectCategory_("Inspeksi Gardu"), "gardu");
   assert.equal(api.masterObjectCategory_("Gardu Distribusi"), "gardu");
+});
+
+test("scoped master rows fail closed for foreign and unresolved ownership", () => {
+  const api = load();
+  const session = { kodeUlp: "001", kodeUp3: "010", ulp: "ULP A" };
+  const rows = api.masterRows_(scopedSheet(), "Master_Gardu", session, "");
+  assert.deepEqual(rows.map((row) => row.Nama), ["A"]);
+  assert.equal(rows[0].Rahasia, "alpha");
 });
