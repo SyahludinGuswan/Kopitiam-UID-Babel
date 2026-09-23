@@ -94,3 +94,9 @@ test("scoped master rows fail closed for foreign and unresolved ownership", () =
   assert.deepEqual(Array.from(rows, (row) => row.Nama), ["A"]);
   assert.equal(rows[0].Rahasia, "alpha");
 });
+
+test("unclassified master datasets fail closed without scope columns", () => {
+  const api = load();
+  const rows = api.masterRows_(masterSheet(), "Master_Penyulang", { kodeUlp: "001" }, "");
+  assert.deepEqual(Array.from(rows), []);
+});
