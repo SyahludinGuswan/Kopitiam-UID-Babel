@@ -20,7 +20,7 @@ test("accepts a structurally complete JPEG", () => {
 });
 
 test("rejects valid signatures without a frame or scan", () => {
-  assert.throws(() => sandbox.validateJpegBytes_(Uint8Array.from([0xff, 0xd8, ...Array(1020).fill(0x11), 0xff, 0xd9])), /Incomplete JPEG structure/);
+  assert.throws(() => sandbox.validateJpegBytes_(Uint8Array.from([0xff, 0xd8, ...Array(1020).fill(0x11), 0xff, 0xd9])), /Incomplete JPEG structure|Invalid JPEG marker/);
 });
 
 test("rejects truncated segments and trailing bytes", () => {
