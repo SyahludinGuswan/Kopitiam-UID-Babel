@@ -18,14 +18,22 @@
 	<string>simandist_mobile</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
-	<key>CFBundleShortVersionString</key>
-	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Simandist membutuhkan kamera untuk mengambil foto bukti inspeksi.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Simandist menggunakan lokasi saat aplikasi aktif untuk mencatat posisi inspeksi.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Simandist menyimpan foto bukti inspeksi ke perpustakaan foto saat Anda memintanya.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Simandist mengakses perpustakaan foto hanya untuk memilih foto bukti inspeksi.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
