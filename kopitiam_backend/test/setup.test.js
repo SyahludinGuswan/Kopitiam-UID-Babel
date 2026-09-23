@@ -114,6 +114,7 @@ function loadBackendSetup() {
   for (const file of fs.readdirSync(root).filter((name) => /\.(js|gs)$/.test(name)).sort()) {
     vm.runInContext(fs.readFileSync(path.join(root, file), "utf8"), backend, { filename: file });
   }
+  backend.configureHarMaterialSheet_();
   const headers = Array.from(backend.temuanSheetHeaders_());
   const config = backend.CONFIG;
   const sheets = new Map();
@@ -138,8 +139,8 @@ function loadBackendSetup() {
     ]));
   }
   woSheets.set(config.MATERIAL_HAR_JAR_SHEET, mockSetupSheet(config.MATERIAL_HAR_JAR_SHEET, [
-    ["Kode Penggunaan Material", "Kode WO", "Material"],
-    ["MAT-TEST", "WO-TEST", "Material uji"],
+    Array.from(backend.HAR_MATERIAL_SETUP_HEADERS_),
+    Array.from(backend.HAR_MATERIAL_SETUP_HEADERS_, (_, i) => `material-${i}`),
   ]));
   backend.SpreadsheetApp = {
     openById(id) {
