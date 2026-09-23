@@ -54,6 +54,19 @@ function setupBackend() {
   ]);
   ensureSheet_(temuan, CONFIG.TEMUAN_SHEET, temuanSheetHeaders_());
 
+  // Metadata is configured separately. Keep legacy setup idempotent while the
+  // Script Property is not yet present; all revision-protected writes remain
+  // fail-closed because their metadata helper still requires this property.
+  var revisionMetadata = "not_configured";
+  var metadataProperty = typeof REVISION_METADATA_CONFIG_ !== "undefined"
+    ? REVISION_METADATA_CONFIG_.spreadsheetProperty
+    : "REVISION_METADATA_SPREADSHEET_ID";
+  var metadataId = PropertiesService.getScriptProperties().getProperty(metadataProperty);
+  if (String(metadataId || "").trim()) {
+    ensureRevisionMetadataSheets_();
+    revisionMetadata = "configured";
+  }
+
   pasangTriggerPembersihanToken_();
   var cleanup = bersihkanTokenPerangkatKedaluwarsa();
   return {
@@ -62,6 +75,7 @@ function setupBackend() {
     version: "2.5.3",
     deviceTokenMaxDays: 7,
     deviceTokenIdleDays: 1,
+    revisionMetadata: revisionMetadata,
     expiredTokensRemoved: cleanup.dihapus,
   };
 }
@@ -145,8 +159,9 @@ function ensureSheet_(spreadsheet, name, headers) {
 
 function validateHeaders_(sheet, requiredHeaders) {
   var lastColumn = sheet.getLastColumn();
-  if (lastColumn < 1)
+  if (lastColumn < 1) {
     throw new Error("Header sheet kosong: " + sheet.getName());
+  }
   var current = sheet
     .getRange(1, 1, 1, lastColumn)
     .getDisplayValues()[0]

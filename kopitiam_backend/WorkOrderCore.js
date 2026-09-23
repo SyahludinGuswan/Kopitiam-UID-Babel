@@ -21,6 +21,14 @@ function woCoreAccess_(session, mode) {
   return { success: true, kodeUlp: kodeUlp, ulp: ulp, subTim: sub };
 }
 
+function woCoreReadRowWithRevision_(sourceSpreadsheetId, sourceSheet, kodeUlp, code, headers, values) {
+  var item = rowObject_(headers, values);
+  var metadata = revisionRead_(sourceSpreadsheetId, sourceSheet, revisionStableKey_([kodeUlp, code]));
+  item._revision = metadata.revision;
+  item._fingerprint = metadata.fingerprint;
+  return item;
+}
+
 function woCoreGet_(token, mode, sheetName) {
   var auth = cekSesi_(token);
   if (!auth.success) return auth;
@@ -51,6 +59,7 @@ function woCoreGet_(token, mode, sheetName) {
     if (!String(values[row][index['kode wo']] || '').trim()) continue;
     var rowKodeUlp = normalizeCode_(values[row][index['kode ulp']]);
     if (!sampleKodeUlp) sampleKodeUlp = rowKodeUlp;
+    var code = String(values[row][index['kode wo']] || '').trim();
     var codeMatches = rowKodeUlp === access.kodeUlp;
     var nameMatches = ulpIndex !== undefined && access.ulp && normalize_(values[row][ulpIndex]) === access.ulp;
     if (!codeMatches && !nameMatches) {
@@ -64,7 +73,7 @@ function woCoreGet_(token, mode, sheetName) {
         continue;
       }
     }
-    rows.push(rowObject_(headers, values[row]));
+    rows.push(woCoreReadRowWithRevision_(source.spreadsheet.getId(), sheet.getName(), access.kodeUlp, code, headers, values[row]));
   }
   return {
     success: true,
@@ -125,16 +134,22 @@ function woCoreSync_(token, mode, sheetName, rows) {
       var code = String(incoming['Kode WO'] || '').trim();
       var target = -1;
       for (var r = 1; r < values.length; r++) {
-        if (String(values[r][index['kode wo']] || '').trim() === code && normalizeCode_(values[r][index['kode ulp']]) === access.kodeUlp) { target = r; break; }
+        if (String(values[r][index['kode wo']] || '').trim() === code && normalizeCode_(values[r][index['kode ulp']]) === access.kodeUlp) {
+          target = r;
+          break;
+        }
       }
       if (target < 0) return fail_('WO_NOT_FOUND', 'WO tidak ditemukan: ' + code);
+      var stableKey = revisionStableKey_([access.kodeUlp, code]);
+      var revisionCheck = revisionAssertCurrent_(source.spreadsheet.getId(), sheet.getName(), stableKey, incoming);
+      if (!revisionCheck.success) return revisionCheck;
       var normalized = {};
-      for (var key in incoming) if (Object.prototype.hasOwnProperty.call(incoming, key)) normalized[normalize_(key)] = incoming[key];
-
+      for (var key in incoming) {
+        if (Object.prototype.hasOwnProperty.call(incoming, key)) normalized[normalize_(key)] = incoming[key];
+      }
       var existingFolderPath = index['folder path'] !== undefined ? values[target][index['folder path']] : '';
       var folderPathVal = normalized['folder path'] || existingFolderPath || ('Kopitiam/WO/' + safePath_(access.kodeUlp) + '/' + safePath_(code) + '/');
       normalized['folder path'] = folderPathVal;
-
       var b64Photo = normalized['foto sesudah base64'] || normalized['fotosesudahbase64'];
       if (b64Photo) {
         try {
@@ -154,13 +169,16 @@ function woCoreSync_(token, mode, sheetName, rows) {
           normalized['foto sesudah'] = cleanFolderPath + '\\' + rawName;
         }
       }
-
       var output = values[target].slice();
       for (var c = 0; c < headers.length; c++) {
         var header = normalize_(headers[c]);
-        if (WO_CORE_MUTABLE[mode].indexOf(header) >= 0 && normalized[header] !== undefined) output[c] = safeCell_(normalized[header]);
+        if (WO_CORE_MUTABLE[mode].indexOf(header) >= 0 && normalized[header] !== undefined) {
+          output[c] = safeCell_(normalized[header]);
+        }
       }
-      sheet.getRange(target + 1, 1, 1, headers.length).setValues([output]);
+      revisionWriteChangedCells_(sheet, target + 1, headers, values[target], output, WO_CORE_MUTABLE[mode]);
+      var committedRow = sheet.getRange(target + 1, 1, 1, headers.length).getValues()[0];
+      revisionCommit_(source.spreadsheet.getId(), sheet.getName(), stableKey, committedRow, 'UPDATE', auth.sesi.username);
       done++;
     }
     SpreadsheetApp.flush();
@@ -170,6 +188,12 @@ function woCoreSync_(token, mode, sheetName, rows) {
   }
 }
 
-function syncWoInsjar_(token, rows) { return woCoreSync_(token, 'insjar', CONFIG.WO_INSJAR_SHEET, rows); }
-function syncWoRow_(token, rows) { return woCoreSync_(token, 'row', CONFIG.WO_ROW_SHEET, rows); }
-function syncWoInsdu_(token, rows) { return woCoreSync_(token, 'insdu', CONFIG.WO_INSDU_SHEET || 'WO_Ins_Du', rows); }
+function syncWoInsjar_(token, rows) {
+  return woCoreSync_(token, 'insjar', CONFIG.WO_INSJAR_SHEET, rows);
+}
+function syncWoRow_(token, rows) {
+  return woCoreSync_(token, 'row', CONFIG.WO_ROW_SHEET, rows);
+}
+function syncWoInsdu_(token, rows) {
+  return woCoreSync_(token, 'insdu', CONFIG.WO_INSDU_SHEET || 'WO_Ins_Du', rows);
+}
