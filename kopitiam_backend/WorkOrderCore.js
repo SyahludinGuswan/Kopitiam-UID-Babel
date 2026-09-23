@@ -21,6 +21,14 @@ function woCoreAccess_(session, mode) {
   return { success: true, kodeUlp: kodeUlp, ulp: ulp, subTim: sub };
 }
 
+function woCoreReadRowWithRevision_(sourceSpreadsheetId, sourceSheet, kodeUlp, code, headers, values) {
+  var item = rowObject_(headers, values);
+  var metadata = revisionRead_(sourceSpreadsheetId, sourceSheet, revisionStableKey_([kodeUlp, code]));
+  item._revision = metadata.revision;
+  item._fingerprint = metadata.fingerprint;
+  return item;
+}
+
 function woCoreGet_(token, mode, sheetName) {
   var auth = cekSesi_(token);
   if (!auth.success) return auth;
@@ -44,6 +52,7 @@ function woCoreGet_(token, mode, sheetName) {
     if (!String(values[row][index['kode wo']] || '').trim()) continue;
     var rowKodeUlp = normalizeCode_(values[row][index['kode ulp']]);
     if (!sampleKodeUlp) sampleKodeUlp = rowKodeUlp;
+    var code = String(values[row][index['kode wo']] || '').trim();
     var codeMatches = rowKodeUlp === access.kodeUlp;
     var nameMatches = ulpIndex !== undefined && access.ulp && normalize_(values[row][ulpIndex]) === access.ulp;
     if (!codeMatches && !nameMatches) { rejectedByUlp++; continue; }
@@ -51,7 +60,7 @@ function woCoreGet_(token, mode, sheetName) {
       var rowTeam = normalize_(values[row][teamIndex]);
       if (rowTeam && rowTeam !== access.subTim) { rejectedByTeam++; continue; }
     }
-    rows.push(rowObject_(headers, values[row]));
+    rows.push(woCoreReadRowWithRevision_(source.spreadsheet.getId(), sheet.getName(), access.kodeUlp, code, headers, values[row]));
   }
   return { success: true, total: rows.length, totalSheet: values.length - 1, kodeUlpFilter: access.kodeUlp, ulpFilter: access.ulp, sourceSpreadsheetId: source.spreadsheet.getId(), sourceSheet: sheet.getName(), sampleKodeUlp: sampleKodeUlp, rejectedByUlp: rejectedByUlp, rejectedByTeam: rejectedByTeam, rows: rows };
 }
@@ -129,7 +138,7 @@ function woCoreSync_(token, mode, sheetName, rows) {
       }
       revisionWriteChangedCells_(sheet, target + 1, headers, values[target], output, WO_CORE_MUTABLE[mode]);
       var committedRow = sheet.getRange(target + 1, 1, 1, headers.length).getValues()[0];
-      revisionCommit_(source.spreadsheet.getId(), sheet.getName(), stableKey, committedRow, 'UPDATE', auth.sesi.username);
+      var committedRevision = revisionCommit_(source.spreadsheet.getId(), sheet.getName(), stableKey, committedRow, 'UPDATE', auth.sesi.username);
       done++;
     }
     SpreadsheetApp.flush();
