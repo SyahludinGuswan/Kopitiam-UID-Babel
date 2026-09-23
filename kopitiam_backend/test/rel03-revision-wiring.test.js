@@ -38,3 +38,11 @@ test('REL-03 stable keys cover Temuan and WO records', () => {
   assert.match(wo, /revisionStableKey_\(\[access\.kodeUlp, code\]\)/);
   assert.match(har, /revisionStableKey_\(\[sesi\.kodeUlp, kodeWo\]\)/);
 });
+
+test('REL-03 read responses expose opaque revision tokens without business columns', () => {
+  const wo = read('WorkOrderCore.js');
+  assert.match(wo, /woCoreReadRowWithRevision_/);
+  assert.match(wo, /item\._revision = metadata\.revision/);
+  assert.match(wo, /item\._fingerprint = metadata\.fingerprint/);
+  assert.doesNotMatch(wo, /Revision.*setValues|setValues.*Revision/);
+});
