@@ -22,6 +22,11 @@ function masterTemuanObject_(headers, row) {
   return column === undefined ? '' : masterObjectCategory_(row[column]);
 }
 
+function masterDatasetScopePolicy_(name) {
+  var global = ['Master_Temuan', 'Jenis Pohon', 'Master_Pekerjaan_Har', 'Master_Material'];
+  return global.indexOf(name) >= 0 ? 'global' : 'scoped';
+}
+
 function masterScopeValue_(session, field) {
   if (field === 'kode ulp') return normalizeCode_(session.kodeUlp);
   if (field === 'ulp') return normalize_(session.ulp);
@@ -41,9 +46,9 @@ function masterScopeFields_(headers) {
   return fields;
 }
 
-function masterRowMatchesSession_(headers, row, session) {
+function masterRowMatchesSession_(headers, row, session, name) {
   var fields = masterScopeFields_(headers);
-  if (!fields.length) return true;
+  if (!fields.length) return masterDatasetScopePolicy_(name) === 'global';
   var hasScopedValue = false;
   for (var i = 0; i < fields.length; i++) {
     var field = fields[i];
@@ -71,7 +76,7 @@ function masterRows_(sheet, name, session, targetObject) {
   var username = normalize_(session.username);
   for (var row = 1; row < values.length; row++) {
     if (name === CONFIG.USERS_SHEET && normalize_(values[row][USER_COL.username]) !== username) continue;
-    if (name !== CONFIG.USERS_SHEET && !masterRowMatchesSession_(headers, values[row], session)) continue;
+    if (name !== CONFIG.USERS_SHEET && !masterRowMatchesSession_(headers, values[row], session, name)) continue;
     if (name === 'Master_Temuan' && targetObject) {
       var rowObject = masterTemuanObject_(headers, values[row]);
       if (!rowObject || rowObject !== targetObject) continue;
