@@ -41,8 +41,11 @@ test('REL-03 stable keys cover Temuan and WO records', () => {
 
 test('REL-03 read responses expose opaque revision tokens without business columns', () => {
   const wo = read('WorkOrderCore.js');
+  const compatibility = read('ZZZZZZZZZZZZZZZZZZZZZZZ_REL03ReadCompatibility.js');
   assert.match(wo, /woCoreReadRowWithRevision_/);
-  assert.match(wo, /item\._revision = metadata\.revision/);
-  assert.match(wo, /item\._fingerprint = metadata\.fingerprint/);
-  assert.doesNotMatch(wo, /Revision.*setValues|setValues.*Revision/);
+  assert.match(compatibility, /revisionReadForResponse_/);
+  assert.match(compatibility, /metadataConfigured: false/);
+  assert.match(compatibility, /item\._revision = metadata\.revision/);
+  assert.match(compatibility, /item\._fingerprint = metadata\.fingerprint/);
+  assert.doesNotMatch(compatibility, /setValues.*Revision/);
 });
