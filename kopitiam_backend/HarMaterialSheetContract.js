@@ -1,5 +1,8 @@
 /* Production contract for the HAR material detail sheet. */
-CONFIG.MATERIAL_HAR_JAR_SHEET = "Material_WO_Har";
+function configureHarMaterialSheet_() {
+  CONFIG.MATERIAL_HAR_JAR_SHEET = "Material_WO_Har";
+  return CONFIG.MATERIAL_HAR_JAR_SHEET;
+}
 
 // Exact business-sheet headers. The runtime reader canonicalizes "Kode WO Har"
 // to "Kode WO"; setup validates the physical sheet names without rewriting it.

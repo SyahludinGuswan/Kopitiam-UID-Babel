@@ -31,6 +31,7 @@ function sheet(headers) {
 test('runtime bundle includes the production HAR material contract', () => {
   assert.ok(manifest.sources.includes('HarMaterialSheetContract.js'));
   const backend = loadContract();
+  assert.equal(backend.configureHarMaterialSheet_(), 'Material_WO_Har');
   assert.equal(backend.CONFIG.MATERIAL_HAR_JAR_SHEET, 'Material_WO_Har');
 });
 
@@ -40,7 +41,7 @@ test('setup accepts the actual Material_WO_Har headers, including trailing blank
   headers.push('', '', '');
   assert.doesNotThrow(() => backend.requireSheet_(
     { getSheetByName: name => name === 'Material_WO_Har' ? sheet(headers) : null },
-    backend.CONFIG.MATERIAL_HAR_JAR_SHEET,
+    backend.configureHarMaterialSheet_(),
     backend.HAR_MATERIAL_SETUP_HEADERS_,
   ));
 });
@@ -51,10 +52,10 @@ test('setup rejects the old/incorrect Kode WO header and never falls back to the
   headers[headers.indexOf('Kode WO Har')] = 'Kode WO';
   assert.throws(() => backend.requireSheet_(
     { getSheetByName: name => name === 'Material_WO_Har' ? sheet(headers) : null },
-    backend.CONFIG.MATERIAL_HAR_JAR_SHEET,
+    backend.configureHarMaterialSheet_(),
     backend.HAR_MATERIAL_SETUP_HEADERS_,
   ), /Kode WO Har/);
   assert.throws(() => backend.requireSheet_({ getSheetByName: () => null },
-    backend.CONFIG.MATERIAL_HAR_JAR_SHEET, backend.HAR_MATERIAL_SETUP_HEADERS_),
+    backend.configureHarMaterialSheet_(), backend.HAR_MATERIAL_SETUP_HEADERS_),
   /Material_WO_Har/);
 });

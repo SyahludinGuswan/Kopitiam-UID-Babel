@@ -47,6 +47,7 @@ function setupBackend() {
     "Status WO",
     "Tim Eksekusi",
   ]);
+  configureHarMaterialSheet_();
   requireSheet_(wo, CONFIG.MATERIAL_HAR_JAR_SHEET, HAR_MATERIAL_SETUP_HEADERS_);
   ensureSheet_(temuan, CONFIG.TEMUAN_SHEET, temuanSheetHeaders_());
 
