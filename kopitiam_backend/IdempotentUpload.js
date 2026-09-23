@@ -117,12 +117,15 @@ function syncTemuanInspeksiIdempotent_(token, incoming) {
   var auth = cekSesi_(token);
   if (!auth.success) return auth;
   if (!incoming || typeof incoming !== "object") return fail_("FINDING_REQUIRED", "Data temuan kosong.");
-  var kodeWo = safeText_(incoming["Kode WO"], 100), code = safeText_(incoming["Kode Temuan"], 120), isC4a = kodeWo === "";
+  var kodeWo = safeText_(incoming["Kode WO"], 100);
+  var isC4a = kodeWo === "";
+  var code = safeText_(incoming["Kode Temuan"], 120);
   if (isC4a) {
     var c4aAccess = requireC4aAccess_(auth.sesi);
     if (!c4aAccess.success) return c4aAccess;
     if (!/^PEG-[A-Z0-9]+\.TO-[0-9]{3}$/.test(code)) return fail_("FINDING_CODE_INVALID", "Kode Temuan C4A tidak valid.");
-    incoming["Kode WO"] = ""; incoming["Jenis WO"] = "";
+    incoming["Kode WO"] = "";
+    incoming["Jenis WO"] = "";
   } else if (code.indexOf(kodeWo + ".TO-") !== 0 || !/^[0-9]{3}$/.test(code.substring((kodeWo + ".TO-").length))) return fail_("FINDING_CODE_INVALID", "Kode Temuan tidak valid.");
   var object = safeText_(incoming["Jenis Object"], 40), finding = safeText_(incoming.Temuan, 200), segment = safeText_(incoming.Segmen, 200);
   if (object !== "Jaringan" && object !== "Gardu") return fail_("OBJECT_INVALID", "Jenis Object harus Jaringan atau Gardu.");
@@ -165,7 +168,7 @@ function syncTemuanInspeksiIdempotent_(token, incoming) {
     var revisionCheck = revisionAssertCurrent_(sheet.getParent().getId(), sheet.getName(), stableKey, incoming);
     if (!revisionCheck.success) return revisionCheck;
     var folder = folderPath_(row["Folder Path"]), primary = putPhotoIdempotent_(folder, code, primaryPrepared); created.push(primary), environment = putPhotoIdempotent_(folder, code, environmentPrepared); created.push(environment);
-    var cleanPath = String(row["Folder Path"]).replace(/[\/\\]+$/, ""); row["Foto Temuan"] = cleanPath + "\\" + primary.name; row["Link Foto"] = primary.url; row["Foto Lingkungan Sekitaran Tiang"] = cleanPath + "\\" + environment.name; row["Link Foto Sekitaran Tiang"] = environment.url;
+    var cleanPath = String(row["Folder Path"]).replace(/[\/\\]+$/, ""); row["Foto Temuan"] = cleanPath + "\\" + primary.name; row["Link Foto"] = primary.url; row["Foto Lingkungan Sekitaran Tiang"] = cleanPath + "\\" + environment.name; row["Link Foto Sekitaran Tiang"] = cleanPath + "\\" + environment.name;
     var normalized = {}; for (var key in row) if (Object.prototype.hasOwnProperty.call(row, key)) normalized[normalize_(key)] = row[key];
     var output = headers.map(function (header) { var value = normalized[normalize_(header)]; return value == null ? "" : safeCell_(value); });
     var numberColumn = ["no", "no.", "nomor"].indexOf(normalize_(headers[0] || "")) >= 0;
