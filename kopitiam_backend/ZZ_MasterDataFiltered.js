@@ -22,6 +22,40 @@ function masterTemuanObject_(headers, row) {
   return column === undefined ? '' : masterObjectCategory_(row[column]);
 }
 
+function masterScopeValue_(session, field) {
+  if (field === 'kode ulp') return normalizeCode_(session.kodeUlp);
+  if (field === 'ulp') return normalize_(session.ulp);
+  if (field === 'kode up3') return normalizeCode_(session.kodeUp3);
+  if (field === 'up3') return normalize_(session.up3);
+  if (field === 'kode uiw') return normalizeCode_(session.kodeUiw);
+  if (field === 'uiw') return normalize_(session.uiw);
+  return '';
+}
+
+function masterScopeFields_(headers) {
+  var index = headerIndex_(headers), fields = [];
+  [['kode ulp', 'kode ulp'], ['ulp', 'ulp'], ['kode up3', 'kode up3'], ['up3', 'up3'], ['kode uiw', 'kode uiw'], ['uiw', 'uiw']].forEach(function (pair) {
+    if (index[pair[0]] !== undefined) fields.push({ key: pair[0], column: index[pair[0]] });
+  });
+  return fields;
+}
+
+function masterRowMatchesSession_(headers, row, session) {
+  var fields = masterScopeFields_(headers);
+  if (!fields.length) return true;
+  var hasScopedValue = false;
+  for (var i = 0; i < fields.length; i++) {
+    var rowValue = normalize_(row[fields[i].column]);
+    if (!rowValue) continue;
+    hasScopedValue = true;
+    var expected = masterScopeValue_(session, fields[i].key);
+    if (!expected) return false;
+    var comparableRow = fields[i].key.indexOf('kode ') === 0 ? normalizeCode_(row[fields[i].column]) : rowValue;
+    if (comparableRow !== expected) return false;
+  }
+  return hasScopedValue;
+}
+
 function masterRows_(sheet, name, session, targetObject) {
   var values = sheet.getDataRange().getDisplayValues();
   var headers = values.length ? values[0].map(function (value) {
@@ -31,6 +65,7 @@ function masterRows_(sheet, name, session, targetObject) {
   var username = normalize_(session.username);
   for (var row = 1; row < values.length; row++) {
     if (name === CONFIG.USERS_SHEET && normalize_(values[row][USER_COL.username]) !== username) continue;
+    if (name !== CONFIG.USERS_SHEET && !masterRowMatchesSession_(headers, values[row], session)) continue;
     if (name === 'Master_Temuan' && targetObject) {
       var rowObject = masterTemuanObject_(headers, values[row]);
       if (!rowObject || rowObject !== targetObject) continue;
