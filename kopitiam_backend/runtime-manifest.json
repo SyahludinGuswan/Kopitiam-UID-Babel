@@ -26,6 +26,6 @@
     "opjFindingProjection_": "ZZZZZZZZZZZZZZZZZZZZZ_Rel07BehaviorGuard.js",
     "opjFinish_": "ZZZZZZZZZZZZZZZZZZZ_OperationJournalIntegrity.js",
     "operationJournalReconcileUser_": "ZZZZZZZZZZZZZZZZZZZ_OperationJournalIntegrity.js",
-    "operationJournalSweepStaleLeases_": "ZZZZZZZZZZZZZZZZZ_OperationJournalScheduled.js"
+    "operationJournalSweepStaleLeases_": "ZZZZZZZZZZZZZZZZZZZZZ_Rel07BehaviorGuard.js"
   }
 }
