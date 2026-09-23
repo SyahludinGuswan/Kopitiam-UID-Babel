@@ -91,6 +91,6 @@ test("scoped master rows fail closed for foreign and unresolved ownership", () =
   const api = load();
   const session = { kodeUlp: "001", kodeUp3: "010", ulp: "ULP A" };
   const rows = api.masterRows_(scopedSheet(), "Master_Gardu", session, "");
-  assert.deepEqual(rows.map((row) => row.Nama), ["A"]);
+  assert.deepEqual(Array.from(rows, (row) => row.Nama), ["A"]);
   assert.equal(rows[0].Rahasia, "alpha");
 });
