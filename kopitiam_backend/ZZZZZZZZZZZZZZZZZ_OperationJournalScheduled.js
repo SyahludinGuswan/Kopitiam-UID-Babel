@@ -71,7 +71,7 @@ function operationJournalReplay_(record) {
 }
 
 function operationJournalScheduledMaintenance_() {
-  var released = operationJournalSweepStaleLeases_();
+  var released = operationJournalSweepStaleLeasesRel07_();
   /* Safe unattended work is limited to stale-lease recovery. Business replay
    * still requires a live user session so authorization is never bypassed. */
   return { success: true, released: released.released || 0 };
