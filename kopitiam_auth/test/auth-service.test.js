@@ -9,13 +9,29 @@ const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, '..', 'AuthService.js'), 'utf8');
 
 function signed(bytes) { return [...bytes].map((byte) => byte > 127 ? byte - 256 : byte); }
+function unsigned(bytes) { return bytes.map((byte) => byte < 0 ? byte + 256 : byte); }
 function load() {
   const cache = new Map(), properties = new Map([['AUTH_SERVICE_SHARED_SECRET', 's'.repeat(32)]]);
   const sandbox = {
     console: {error() {}}, Date, JSON, Math, Number, String, Array, Object, parseInt,
     PropertiesService: {getScriptProperties: () => ({getProperty: key => properties.get(key) || null, setProperty: (key, value) => properties.set(key, String(value)), deleteProperty: key => properties.delete(key), getProperties: () => Object.fromEntries(properties)})},
     CacheService: {getScriptCache: () => ({get: key => cache.get(key) || null, put: (key, value) => cache.set(key, String(value)), remove: key => cache.delete(key)})},
-    Utilities: {Charset: {UTF_8: 'utf8'}, DigestAlgorithm: {SHA_256: 'sha256'}, computeDigest(_algorithm, value) { return signed(crypto.createHash('sha256').update(String(value)).digest()); }, computeHmacSha256Signature(value, secret) { return signed(crypto.createHmac('sha256', String(secret)).update(Buffer.from(Array.isArray(value) ? value.map(byte => byte < 0 ? byte + 256 : byte) : String(value))).digest()); }, getUuid: () => '01234567-89ab-4cde-8fab-0123456789ab'},
+    Utilities: {
+      Charset: {UTF_8: 'utf8'},
+      DigestAlgorithm: {SHA_256: 'sha256'},
+      computeDigest(_algorithm, value) {
+        const bytes = Array.isArray(value) ? Buffer.from(unsigned(value)) : Buffer.from(String(value), 'utf8');
+        return signed(crypto.createHash('sha256').update(bytes).digest());
+      },
+      computeHmacSha256Signature(value, secret) {
+        return signed(crypto.createHmac('sha256', String(secret)).update(Buffer.from(Array.isArray(value) ? unsigned(value) : Buffer.from(String(value), 'utf8'))).digest());
+      },
+      newBlob(value) {
+        const bytes = Buffer.from(String(value), 'utf8');
+        return {getBytes: () => signed(bytes)};
+      },
+      getUuid: () => '01234567-89ab-4cde-8fab-0123456789ab',
+    },
   };
   vm.createContext(sandbox); vm.runInContext(source, sandbox, {filename: 'AuthService.js'}); return {api: sandbox};
 }
