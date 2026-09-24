@@ -12,6 +12,7 @@ function signed(bytes) { return [...bytes].map((byte) => byte > 127 ? byte - 256
 function unsigned(bytes) { return bytes.map((byte) => byte < 0 ? byte + 256 : byte); }
 function load() {
   const cache = new Map(), properties = new Map([['AUTH_SERVICE_SHARED_SECRET', 's'.repeat(32)]]);
+  let byteHmacCalls = 0;
   const sandbox = {
     console: {error() {}}, Date, JSON, Math, Number, String, Array, Object, parseInt,
     PropertiesService: {getScriptProperties: () => ({getProperty: key => properties.get(key) || null, setProperty: (key, value) => properties.set(key, String(value)), deleteProperty: key => properties.delete(key), getProperties: () => Object.fromEntries(properties)})},
@@ -23,8 +24,12 @@ function load() {
         const bytes = Array.isArray(value) ? Buffer.from(unsigned(value)) : Buffer.from(String(value), 'utf8');
         return signed(crypto.createHash('sha256').update(bytes).digest());
       },
-      computeHmacSha256Signature(value, secret) {
-        return signed(crypto.createHmac('sha256', String(secret)).update(Buffer.from(Array.isArray(value) ? unsigned(value) : Buffer.from(String(value), 'utf8'))).digest());
+      computeHmacSha256Signature(value, key, charset) {
+        if (Array.isArray(value) && Array.isArray(key)) {
+          byteHmacCalls++;
+          return signed(crypto.createHmac('sha256', Buffer.from(unsigned(key))).update(Buffer.from(unsigned(value))).digest());
+        }
+        return signed(crypto.createHmac('sha256', String(key)).update(Buffer.from(String(value), charset || 'utf8')).digest());
       },
       newBlob(value) {
         const bytes = Buffer.from(String(value), 'utf8');
@@ -33,12 +38,16 @@ function load() {
       getUuid: () => '01234567-89ab-4cde-8fab-0123456789ab',
     },
   };
-  vm.createContext(sandbox); vm.runInContext(source, sandbox, {filename: 'AuthService.js'}); return {api: sandbox};
+  vm.createContext(sandbox); vm.runInContext(source, sandbox, {filename: 'AuthService.js'});
+  return {api: sandbox, byteHmacCalls: () => byteHmacCalls};
 }
 
-test('PBKDF2-HMAC-SHA-256 output matches the standard implementation', () => {
-  const {api} = load(), salt = '0a'.repeat(32), password = 'Correct Horse Battery Staple';
+test('PBKDF2-HMAC-SHA-256 output matches standard vectors through native byte-array HMAC', () => {
+  const {api, byteHmacCalls} = load(), salt = '0a'.repeat(32), password = 'Correct Horse Battery Staple';
   assert.equal(api.authPbkdf2Hex_(password, salt, 120000), crypto.pbkdf2Sync(password, Buffer.from(salt, 'hex'), 120000, 32, 'sha256').toString('hex'));
+  assert.equal(byteHmacCalls(), 120000, 'each PBKDF2 round should use the native byte-array HMAC overload');
+  const longPassword = 'p'.repeat(80);
+  assert.equal(api.authPbkdf2Hex_(longPassword, salt, 100000), crypto.pbkdf2Sync(longPassword, Buffer.from(salt, 'hex'), 100000, 32, 'sha256').toString('hex'));
   assert.equal(api.authPbkdf2Hex_(password, salt, 99999), '');
 });
 test('signed internal envelopes reject reuse and altered payloads', () => {
