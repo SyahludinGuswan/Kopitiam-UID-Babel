@@ -13,6 +13,7 @@ function unsigned(bytes) { return bytes.map((byte) => byte < 0 ? byte + 256 : by
 function load() {
   const cache = new Map(), properties = new Map([['AUTH_SERVICE_SHARED_SECRET', 's'.repeat(32)]]);
   let byteHmacCalls = 0;
+  let newBlobCalls = 0;
   const sandbox = {
     console: {error() {}}, Date, JSON, Math, Number, String, Array, Object, parseInt,
     PropertiesService: {getScriptProperties: () => ({getProperty: key => properties.get(key) || null, setProperty: (key, value) => properties.set(key, String(value)), deleteProperty: key => properties.delete(key), getProperties: () => Object.fromEntries(properties)})},
@@ -32,6 +33,7 @@ function load() {
         return signed(crypto.createHmac('sha256', String(key)).update(Buffer.from(String(value), charset || 'utf8')).digest());
       },
       newBlob(value) {
+        newBlobCalls++;
         const bytes = Buffer.from(String(value), 'utf8');
         return {getBytes: () => signed(bytes)};
       },
@@ -39,15 +41,17 @@ function load() {
     },
   };
   vm.createContext(sandbox); vm.runInContext(source, sandbox, {filename: 'AuthService.js'});
-  return {api: sandbox, byteHmacCalls: () => byteHmacCalls};
+  return {api: sandbox, byteHmacCalls: () => byteHmacCalls, newBlobCalls: () => newBlobCalls};
 }
 
-test('PBKDF2-HMAC-SHA-256 output matches standard vectors through native byte-array HMAC', () => {
-  const {api, byteHmacCalls} = load(), salt = '0a'.repeat(32), password = 'Correct Horse Battery Staple';
+test('PBKDF2-HMAC-SHA-256 output matches standard vectors and caches key bytes', () => {
+  const {api, byteHmacCalls, newBlobCalls} = load(), salt = '0a'.repeat(32), password = 'Correct Horse Battery Staple';
   assert.equal(api.authPbkdf2Hex_(password, salt, 120000), crypto.pbkdf2Sync(password, Buffer.from(salt, 'hex'), 120000, 32, 'sha256').toString('hex'));
   assert.equal(byteHmacCalls(), 120000, 'each PBKDF2 round should use the native byte-array HMAC overload');
+  assert.equal(newBlobCalls(), 1, 'password bytes should be materialized once per derivation');
   const longPassword = 'p'.repeat(80);
   assert.equal(api.authPbkdf2Hex_(longPassword, salt, 100000), crypto.pbkdf2Sync(longPassword, Buffer.from(salt, 'hex'), 100000, 32, 'sha256').toString('hex'));
+  assert.equal(newBlobCalls(), 2, 'each derivation should materialize password bytes once');
   assert.equal(api.authPbkdf2Hex_(password, salt, 99999), '');
 });
 test('signed internal envelopes reject reuse and altered payloads', () => {
