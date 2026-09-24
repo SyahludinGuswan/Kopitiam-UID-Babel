@@ -181,12 +181,26 @@ function authUserActive_(user) { return ['aktif', 'active', '1', 'true'].indexOf
 function authResetRequired_(user) { return ['ya', 'yes', '1', 'true'].indexOf(authNormalize_(user.resetRequired)) >= 0; }
 function authSheet_() { var id = String(PropertiesService.getScriptProperties().getProperty('AUTH_SPREADSHEET_ID') || '').trim(); if (!/^[A-Za-z0-9_-]{20,}$/.test(id)) throw new Error('AUTH_SPREADSHEET_ID belum dikonfigurasi.'); var sheet = SpreadsheetApp.openById(id).getSheetByName(AUTH_CONFIG_.USERS_SHEET); if (!sheet) throw new Error('Sheet Credentials tidak ditemukan.'); return sheet; }
 function authHeaderIndex_(headers) { var index = {}; headers.forEach(function (header, position) { index[authNormalize_(header)] = position; }); AUTH_HEADERS_.forEach(function (header) { if (index[authNormalize_(header)] === undefined) throw new Error('Header Credentials tidak lengkap: ' + header); }); return index; }
-function authPbkdf2Hex_(password, salt, iterations) { iterations = Number(iterations); if (!/^[a-f0-9]{64}$/i.test(String(salt)) || iterations < 100000 || iterations > 500000) return ''; var block = authHmacBytes_(password, authHexBytes_(salt).concat([0, 0, 0, 1])), output = block.slice(); for (var round = 1; round < iterations; round++) { block = authHmacBytes_(password, block); for (var index = 0; index < output.length; index++) output[index] = output[index] ^ block[index]; } return authBytesHex_(output); }
+function authPbkdf2Hex_(password, salt, iterations) {
+  iterations = Number(iterations);
+  if (!/^[a-f0-9]{64}$/i.test(String(salt)) || iterations < 100000 || iterations > 500000) return '';
+  var keyBytes = Utilities.newBlob(String(password)).getBytes();
+  try {
+    var block = authHmacBytes_(keyBytes, authHexBytes_(salt).concat([0, 0, 0, 1]));
+    var output = block.slice();
+    for (var round = 1; round < iterations; round++) {
+      block = authHmacBytes_(keyBytes, block);
+      for (var index = 0; index < output.length; index++) output[index] = output[index] ^ block[index];
+    }
+    return authBytesHex_(output);
+  } finally {
+    for (var byteIndex = 0; byteIndex < keyBytes.length; byteIndex++) keyBytes[byteIndex] = 0;
+  }
+}
 
 // Native byte-array HMAC avoids two Utilities.computeDigest service calls per PBKDF2 round.
-function authHmacBytes_(secret, bytes) {
-  var key = Utilities.newBlob(String(secret)).getBytes();
-  return Utilities.computeHmacSha256Signature(bytes, key);
+function authHmacBytes_(keyBytes, bytes) {
+  return Utilities.computeHmacSha256Signature(bytes, keyBytes);
 }
 
 function authHmacHex_(secret, message) { return authBytesHex_(Utilities.computeHmacSha256Signature(String(message), String(secret), Utilities.Charset.UTF_8)); }
